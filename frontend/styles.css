@@ -1,0 +1,134 @@
+:root {
+  --brand-color: #fd710d;
+  --brand-color-dark: #e5640b;
+  --brand-soft-bg: #fff4ea;
+  --brand-soft-border: #ffd9bc;
+}
+
+body {
+  background-color: #faf9f8;
+}
+
+.hero-section {
+  background:
+    radial-gradient(circle at top right, rgba(253, 113, 13, 0.1), transparent 35%),
+    radial-gradient(circle at bottom left, rgba(25, 135, 84, 0.10), transparent 35%),
+    #ffffff;
+}
+
+.demo-card,
+.info-card,
+.feature-box,
+.project-card {
+  border-radius: 1rem;
+}
+
+.feature-box,
+.info-card {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  padding: 1rem;
+}
+
+.info-card {
+  height: 100%;
+}
+
+.search-box {
+  min-width: 280px;
+}
+
+.project-card {
+  background: white;
+  border: 0;
+  box-shadow: 0 .25rem 1rem rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  height: 100%;
+}
+
+.project-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .5rem 1.25rem rgba(0, 0, 0, 0.08);
+}
+
+.badge-soft {
+  background-color: var(--brand-soft-bg);
+  color: var(--brand-color);
+  border: 1px solid var(--brand-soft-border);
+}
+
+.builder-badge {
+  background-color: #fff0e2;
+  color: var(--brand-color);
+  border: 1px solid #ffcfab;
+}
+
+.check-item-done {
+  text-decoration: line-through;
+  color: #6c757d;
+}
+
+.empty-state {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  text-align: center;
+  border: 1px solid #e9ecef;
+}
+
+.inline-remove-btn {
+  border: 0;
+  background: transparent;
+  color: #dc3545;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0.1rem;
+  cursor: pointer;
+}
+
+.inline-edit-btn {
+  border: 0;
+  background: transparent;
+  color: var(--brand-color);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0.1rem;
+  cursor: pointer;
+}
+
+.inline-remove-btn:hover,
+.inline-edit-btn:hover {
+  opacity: 0.8;
+}
+
+.text-primary {
+  color: var(--brand-color) !important;
+}
+
+.btn-primary {
+  background-color: var(--brand-color);
+  border-color: var(--brand-color);
+  color: #fff;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--brand-color-dark);
+  border-color: var(--brand-color-dark);
+}
+
+.btn-outline-primary {
+  color: var(--brand-color);
+  border-color: var(--brand-color);
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  background-color: var(--brand-color);
+  border-color: var(--brand-color);
+  color: #fff;
+}
+
+.home-page .badge.text-bg-primary {
+  background-color: var(--brand-color) !important;
+}

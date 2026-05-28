@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="project-view.xsl"?>
+<?xml-stylesheet type="text/css" href="project-view.css"?>
+<projects>
+  <project id="1">
+    <title>Launch Week Plan</title>
+    <category>Operations</category>
+    <description>Planning structure for organizing priorities, leads and follow-up tasks for a focused launch week.</description>
+    <owner>Maria</owner>
+
+    <checklist>
+      <item done="true">Confirm launch goals</item>
+      <item done="true">Collect final assets</item>
+      <item done="false">Review launch timeline</item>
+      <item done="false">Send kickoff update</item>
+    </checklist>
+
+    <table>
+      <row>
+        <task>Finalize task board</task>
+        <status>Done</status>
+        <priority>Medium</priority>
+      </row>
+      <row>
+        <task>Review open blockers</task>
+        <status>In progress</status>
+        <priority>High</priority>
+      </row>
+      <row>
+        <task>Prepare end-of-day recap</task>
+        <status>Pending</status>
+        <priority>Low</priority>
+      </row>
+    </table>
+  </project>
+
+  <project id="2">
+    <title>Study Workflow Reset</title>
+    <category>Personal Organization</category>
+    <description>Simple project for sorting ideas, weekly goals and daily actions into a cleaner routine.</description>
+    <owner>Andreea</owner>
+
+    <checklist>
+      <item done="true">List current priorities</item>
+      <item done="false">Build weekly routine</item>
+      <item done="false">Sort loose notes</item>
+      <item done="false">Review progress after one week</item>
+    </checklist>
+
+    <table>
+      <row>
+        <task>Group scattered ideas</task>
+        <status>In progress</status>
+        <priority>High</priority>
+      </row>
+      <row>
+        <task>Draft weekly plan</task>
+        <status>Pending</status>
+        <priority>Medium</priority>
+      </row>
+      <row>
+        <task>Archive completed notes</task>
+        <status>Pending</status>
+        <priority>Low</priority>
+      </row>
+    </table>
+  </project>
+
+  <project id="3">
+    <title>Content Calendar Sprint</title>
+    <category>Team Workflow</category>
+    <description>Shared space for collecting ideas, assigning priorities and keeping a weekly content plan on track.</description>
+    <owner>Elena</owner>
+
+    <checklist>
+      <item done="true">Choose weekly themes</item>
+      <item done="true">Collect draft ideas</item>
+      <item done="false">Review approval queue</item>
+      <item done="false">Schedule publishing slots</item>
+    </checklist>
+
+    <table>
+      <row>
+        <task>Finalize post briefs</task>
+        <status>Done</status>
+        <priority>High</priority>
+      </row>
+      <row>
+        <task>Arrange publishing schedule</task>
+        <status>In progress</status>
+        <priority>Medium</priority>
+      </row>
+      <row>
+        <task>Archive published ideas</task>
+        <status>Pending</status>
+        <priority>Low</priority>
+      </row>
+    </table>
+  </project>
+</projects>
