@@ -141,6 +141,18 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
+input.input-error {
+  border-color: var(--danger);
+}
+
+.field-error {
+  display: block;
+  margin-top: 5px;
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .button {
   display: inline-flex;
   min-height: 40px;

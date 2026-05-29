@@ -52,19 +52,34 @@ function App() {
 }
 
 function RegisterPage({ navigate }) {
-  const [form, setForm] = useState({ email: "", username: "", password: "" });
+  const [form, setForm] = useState({ email: "", username: "", password: "", confirmPassword: "" });
+  const [fieldErrors, setFieldErrors] = useState({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(event) {
     event.preventDefault();
+    const payload = {
+      email: form.email.trim().toLowerCase(),
+      username: form.username.trim(),
+      password: form.password
+    };
+    const errors = validateRegistration({ ...payload, confirmPassword: form.confirmPassword });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setMessage("Check the highlighted fields.");
+      return;
+    }
+
     setBusy(true);
     setMessage("");
     try {
-      await registerAccount(form);
-      setMessage("Account created. You can log in now.");
-      setForm({ email: "", username: "", password: "" });
+      await registerAccount(payload);
+      await login(payload.username, payload.password);
+      await getCurrentUser();
+      navigate("/dashboard.html");
     } catch (error) {
+      if (error.data?.fields) setFieldErrors(error.data.fields);
       setMessage(error.message);
     } finally {
       setBusy(false);
@@ -85,11 +100,12 @@ function RegisterPage({ navigate }) {
       </section>
       <section className="auth-card">
         <h2>Create your account</h2>
-        <form className="form-stack" onSubmit={submit}>
-          <Field label="Email" value={form.email} onChange={email => setForm({ ...form, email })} type="email" />
-          <Field label="Username" value={form.username} onChange={username => setForm({ ...form, username })} />
-          <Field label="Password" value={form.password} onChange={password => setForm({ ...form, password })} type="password" />
-          <button className="button primary" disabled={busy}>{busy ? "Creating..." : "Register"}</button>
+        <form className="form-stack" onSubmit={submit} noValidate>
+          <Field label="Email" value={form.email} onChange={email => setForm({ ...form, email })} type="email" error={fieldErrors.email} autoComplete="email" />
+          <Field label="Username" value={form.username} onChange={username => setForm({ ...form, username })} error={fieldErrors.username} autoComplete="username" />
+          <Field label="Password" value={form.password} onChange={password => setForm({ ...form, password })} type="password" error={fieldErrors.password} autoComplete="new-password" />
+          <Field label="Confirm password" value={form.confirmPassword} onChange={confirmPassword => setForm({ ...form, confirmPassword })} type="password" error={fieldErrors.confirmPassword} autoComplete="new-password" />
+          <button className="button primary" disabled={busy}>{busy ? "Creating account..." : "Register"}</button>
         </form>
         {message && <p className="form-message">{message}</p>}
         <button className="link-button" onClick={() => navigate("/login.html")}>Already have an account? Log in</button>
@@ -689,11 +705,19 @@ function AppShell({ user, navigate, children }) {
   );
 }
 
-function Field({ label, value, onChange, type = "text" }) {
+function Field({ label, value, onChange, type = "text", error, ...inputProps }) {
   return (
     <label>
       <span>{label}</span>
-      <input type={type} value={value} onChange={event => onChange(event.target.value)} required />
+      <input
+        className={error ? "input-error" : ""}
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        required
+        {...inputProps}
+      />
+      {error && <small className="field-error">{error}</small>}
     </label>
   );
 }
@@ -719,6 +743,46 @@ function titleFor(type) {
   if (type === "table") return "New Table";
   if (type === "diagram") return "New Diagram";
   return "New Checklist";
+}
+
+function validateRegistration(form) {
+  const errors = {};
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const usernamePattern = /^[a-zA-Z0-9._-]+$/;
+
+  if (!form.email) {
+    errors.email = "Email is required.";
+  } else if (!emailPattern.test(form.email)) {
+    errors.email = "Enter a valid email address.";
+  } else if (form.email.length > 255) {
+    errors.email = "Email must be 255 characters or fewer.";
+  }
+
+  if (!form.username) {
+    errors.username = "Username is required.";
+  } else if (form.username.length < 3) {
+    errors.username = "Username must be at least 3 characters.";
+  } else if (form.username.length > 100) {
+    errors.username = "Username must be 100 characters or fewer.";
+  } else if (!usernamePattern.test(form.username)) {
+    errors.username = "Use letters, numbers, dots, underscores, or hyphens.";
+  }
+
+  if (!form.password) {
+    errors.password = "Password is required.";
+  } else if (form.password.length < 8) {
+    errors.password = "Password must be at least 8 characters.";
+  } else if (form.password.length > 100) {
+    errors.password = "Password must be 100 characters or fewer.";
+  }
+
+  if (!form.confirmPassword) {
+    errors.confirmPassword = "Confirm your password.";
+  } else if (form.password !== form.confirmPassword) {
+    errors.confirmPassword = "Passwords do not match.";
+  }
+
+  return errors;
 }
 
 function parseJson(value) {
