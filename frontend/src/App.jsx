@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   clearToken,
+  convertBlock,
   createBlock,
   createChecklistItem,
   createDiagram,
@@ -29,6 +30,7 @@ import {
 
 const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb" };
 const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
+const BLOCK_TYPES = ["checklist", "table", "diagram"];
 const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
 
 function App() {
@@ -298,6 +300,11 @@ function SpacePage({ navigate, spaceId }) {
     refresh();
   }
 
+  async function convertAndRefresh(block, targetType) {
+    await convertBlock(block.id, targetType);
+    await refresh();
+  }
+
   return (
     <AppShell navigate={navigate}>
       <section className="space-title">
@@ -358,7 +365,10 @@ function SpacePage({ navigate, spaceId }) {
                 <span>{item.block.type}</span>
                 <h2>{item.block.title}</h2>
               </div>
-              <button className="button danger small" draggable="false" onDragStart={event => event.stopPropagation()} onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+              <div className="block-actions" draggable="false" onDragStart={event => event.stopPropagation()}>
+                <ConversionMenu block={item.block} onConvert={targetType => convertAndRefresh(item.block, targetType)} />
+                <button className="button danger small" onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+              </div>
             </header>
             {item.block.type === "checklist" && <ChecklistBlock block={item.block} items={item.content || []} refresh={refresh} />}
             {item.block.type === "table" && <TableBlock block={item.block} rows={item.content || []} refresh={refresh} />}
@@ -367,6 +377,24 @@ function SpacePage({ navigate, spaceId }) {
         ))}
       </section>
     </AppShell>
+  );
+}
+
+function ConversionMenu({ block, onConvert }) {
+  const options = BLOCK_TYPES.filter(type => type !== block.type);
+
+  return (
+    <details className="convert-dropdown">
+      <summary>Convert</summary>
+      <div className="convert-menu">
+        {options.map(type => (
+          <button type="button" key={type} onClick={() => onConvert(type)}>
+            <span>Convert to</span>
+            {titleFor(type).replace("New ", "")}
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -484,8 +512,8 @@ function TableBlock({ block, rows, refresh }) {
         {rows.map(row => (
           <div className="data-row" key={row.id}>
             <span className="row-title">{row.title}</span>
-            <span>{row.status}</span>
-            <span>{row.priority || "none"}</span>
+            <span><StatusBadge status={row.status} /></span>
+            <span><PriorityBadge priority={row.priority || "low"} /></span>
             <span>{row.dueDate || "no date"}</span>
             <div className="row-actions">
               <button className="button secondary small" type="button" onClick={() => editRow(row)}>Edit</button>
@@ -496,6 +524,16 @@ function TableBlock({ block, rows, refresh }) {
       </div>
     </div>
   );
+}
+
+function StatusBadge({ status }) {
+  const value = status || "todo";
+  return <span className={`badge status-${value}`}>{value}</span>;
+}
+
+function PriorityBadge({ priority }) {
+  const value = priority || "low";
+  return <span className={`badge priority-${value}`}>{value}</span>;
 }
 
 function DiagramBlock({ block, content, refresh }) {

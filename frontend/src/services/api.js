@@ -113,6 +113,10 @@ export async function deleteBlock(blockId) {
   return apiFetch(`/api/blocks/${blockId}`, { method: "DELETE" });
 }
 
+export async function convertBlock(blockId, targetType) {
+  return apiFetch(`/api/blocks/${blockId}/convert/${targetType}`, { method: "POST" });
+}
+
 export async function createChecklistItem(blockId, payload) {
   return apiFetch(`/api/blocks/${blockId}/checklist-items`, { method: "POST", body: payload });
 }

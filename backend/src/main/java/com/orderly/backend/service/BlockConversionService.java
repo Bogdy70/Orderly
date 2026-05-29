@@ -40,6 +40,7 @@ public class BlockConversionService {
 
   public BlockDtos.BlockFullResponse convert(Long blockId, BlockType targetType) {
     BlockEntity source = blockService.getEntity(blockId);
+    blockService.shiftPositionsAfter(source.getSpace().getId(), source.getPosition());
     BlockEntity target = blockService.createEntity(
         source.getSpace().getId(),
         targetType,
@@ -110,8 +111,8 @@ public class BlockConversionService {
               80.0 + index * 120.0,
               220.0,
               72.0,
-              item.getDone() ? "{\"checked\":true}" : "{\"checked\":false}",
-              "{\"source\":\"checklist\"}"
+              "{\"color\":\"" + checklistColor(item.getDone()) + "\"}",
+              "{\"source\":\"checklist\",\"checked\":" + item.getDone() + "}"
           );
         }
       }
@@ -127,7 +128,7 @@ public class BlockConversionService {
               80.0 + index * 120.0,
               240.0,
               78.0,
-              "{}",
+              "{\"color\":\"" + statusColor(row.getStatus()) + "\"}",
               tableRowDataJson(row)
           );
         }
@@ -159,6 +160,18 @@ public class BlockConversionService {
         + "\"priority\":" + jsonString(row.getPriority()) + ","
         + "\"dueDate\":" + jsonString(dueDate)
         + "}";
+  }
+
+  private String checklistColor(Boolean done) {
+    return Boolean.TRUE.equals(done) ? "#0f766e" : "#d97706";
+  }
+
+  private String statusColor(String status) {
+    return switch (status == null ? "todo" : status.toLowerCase()) {
+      case "done" -> "#0f766e";
+      case "pending" -> "#7c2d5a";
+      default -> "#d97706";
+    };
   }
 
   private String jsonString(String value) {

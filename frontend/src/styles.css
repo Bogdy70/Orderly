@@ -395,6 +395,94 @@ input.input-error {
   color: #281c16;
 }
 
+.block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.convert-dropdown {
+  position: relative;
+}
+
+.convert-dropdown summary {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(15, 118, 110, 0.26);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #fff;
+  padding: 0 10px;
+  font-size: 0.86rem;
+  font-weight: 900;
+  list-style: none;
+  box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.convert-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.convert-dropdown summary::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+}
+
+.convert-dropdown[open] summary,
+.convert-dropdown summary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(15, 118, 110, 0.24);
+}
+
+.convert-menu {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 176px;
+  gap: 4px;
+  margin-top: 8px;
+  border: 1px solid rgba(111, 78, 55, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 252, 247, 0.96);
+  padding: 6px;
+  box-shadow: var(--shadow-strong);
+  backdrop-filter: blur(18px);
+}
+
+.convert-menu button {
+  display: grid;
+  gap: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #241814;
+  padding: 9px 10px;
+  text-align: left;
+  font-weight: 900;
+}
+
+.convert-menu button:hover {
+  background: rgba(204, 251, 241, 0.72);
+}
+
+.convert-menu button span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .block-body {
   overflow: visible;
   padding: 16px;
@@ -442,7 +530,7 @@ input.input-error {
 }
 
 .data-row {
-  grid-template-columns: minmax(220px, 1fr) 100px 100px 110px auto;
+  grid-template-columns: minmax(180px, 1.4fr) 92px 96px 110px 150px;
 }
 
 .table-head {
@@ -454,6 +542,47 @@ input.input-error {
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.table-head span:last-child {
+  text-align: right;
+}
+
+.badge {
+  display: inline-flex;
+  min-width: 64px;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.status-done,
+.priority-low {
+  border-color: rgba(15, 118, 110, 0.18);
+  background: rgba(204, 251, 241, 0.82);
+  color: #0f5f59;
+}
+
+.status-pending,
+.priority-medium {
+  border-color: rgba(124, 45, 90, 0.18);
+  background: rgba(252, 231, 243, 0.88);
+  color: #7c2d5a;
+}
+
+.status-todo,
+.priority-high {
+  border-color: rgba(217, 119, 6, 0.2);
+  background: rgba(254, 243, 199, 0.9);
+  color: #92400e;
 }
 
 .row-title {
