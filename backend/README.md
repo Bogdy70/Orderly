@@ -11,6 +11,8 @@ Spring Boot API for Orderly spaces, blocks, checklist items, table rows and diag
 - PostgreSQL
 - Flyway migrations
 - Springdoc OpenAPI / Swagger UI
+- Spring Security OAuth2 resource server
+- Keycloak for local authentication
 
 ## Database
 
@@ -150,6 +152,98 @@ The OpenAPI JSON is available at:
 http://localhost:8080/v3/api-docs
 ```
 
+## Keycloak
+
+Start Keycloak and its database from the repository root:
+
+```bash
+docker-compose --profile auth up -d keycloak
+```
+
+This imports the local realm from `backend/keycloak/orderly-realm.json`.
+
+Keycloak admin console:
+
+```text
+http://localhost:8081
+```
+
+Default admin login:
+
+```text
+username: admin
+password: admin
+```
+
+Imported realm:
+
+```text
+orderly
+```
+
+Frontend public client:
+
+```text
+orderly-frontend
+```
+
+Demo user:
+
+```text
+username: demo
+password: demo
+email: demo@orderly.local
+email verified: true
+```
+
+The backend validates JWTs with:
+
+```text
+KEYCLOAK_ISSUER_URI=http://localhost:8081/realms/orderly
+```
+
+`/api/**` endpoints require a Keycloak access token. Swagger and OpenAPI docs remain public.
+
+Swagger is configured for Keycloak OAuth2 login with PKCE. Open Swagger UI, click `Authorize`, use client `orderly-frontend`, and log in with a Keycloak account. After that, Swagger sends the token for API requests automatically.
+
+Swagger now uses a fixed local OAuth callback URL: `http://localhost:8080/swagger-ui/oauth2-redirect.html`. That keeps the redirect URI stable and avoids host-based mismatches during login.
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+The backend also requires `email_verified=true` and a non-empty `email` claim in the JWT. Disable this only for local debugging:
+
+```bash
+REQUIRE_VERIFIED_EMAIL=false
+```
+
+Get a local access token with the demo user:
+
+```bash
+curl -X POST "http://localhost:8081/realms/orderly/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=orderly-frontend" \
+  -d "grant_type=password" \
+  -d "username=demo" \
+  -d "password=demo"
+```
+
+Use the returned `access_token`:
+
+```bash
+curl http://localhost:8080/api/spaces \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Create a Keycloak account through the backend:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"alex@example.com\",\"username\":\"alex\",\"password\":\"change-me\"}"
+```
+
 ## Seed Data
 
 `V2__seed_demo_data.sql` creates:
@@ -162,21 +256,36 @@ http://localhost:8080/v3/api-docs
 
 ## Example Requests
 
-Create a user:
+Connect the current Keycloak account to a local Orderly user:
 
 ```bash
 curl -X POST http://localhost:8080/api/users \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"alex@example.com\",\"username\":\"alex\",\"passwordHash\":\"mock-hash\"}"
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d "{\"email\":\"alex@example.com\",\"username\":\"alex\"}"
 ```
+
+The posted `email` must match the verified email claim in the authenticated Keycloak token. The backend stores the Keycloak subject as `keycloak_id`; it does not store passwords or password hashes.
+
+Read the connected local user:
+
+```bash
+curl http://localhost:8080/api/users/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+This returns `404` until the authenticated Keycloak account is connected with `POST /api/users`.
 
 Create a space:
 
 ```bash
 curl -X POST http://localhost:8080/api/spaces \
   -H "Content-Type: application/json" \
-  -d "{\"ownerId\":1,\"name\":\"Personal Plan\",\"description\":\"Notes and next actions\",\"icon\":\"folder\",\"color\":\"#e86d13\"}"
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d "{\"name\":\"Personal Plan\",\"description\":\"Notes and next actions\",\"icon\":\"folder\",\"color\":\"#e86d13\"}"
 ```
+
+`ownerId` is assigned from the authenticated Keycloak user. You should not pass it in Swagger.
 
 Create a checklist block:
 

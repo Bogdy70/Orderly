@@ -11,6 +11,40 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/orderly}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/orderly/protocol/openid-connect/certs}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    oauth2-redirect-url: ${SWAGGER_OAUTH2_REDIRECT_URL:http://localhost:8080/swagger-ui/oauth2-redirect.html}
+    operations-sorter: method
+    tags-sorter: alpha
+    oauth:
+      client-id: ${KEYCLOAK_SWAGGER_CLIENT_ID:orderly-frontend}
+      use-pkce-with-authorization-code-grant: true
+      scopes: openid profile email
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
+
+keycloak:
+  server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8081}
+  realm: ${KEYCLOAK_REALM:orderly}
+  admin:
+    username: ${KEYCLOAK_ADMIN:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
 
 server:
   port: ${PORT:8080}
+
+orderly:
+  security:
+    require-verified-email: ${REQUIRE_VERIFIED_EMAIL:true}

@@ -1,7 +1,6 @@
 package com.orderly.backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
 
@@ -10,7 +9,6 @@ public final class SpaceDtos {
   }
 
   public record CreateSpaceRequest(
-      @NotNull Long ownerId,
       @NotBlank String name,
       String description,
       String icon,
@@ -19,7 +17,6 @@ public final class SpaceDtos {
   }
 
   public record UpdateSpaceRequest(
-      Long ownerId,
       String name,
       String description,
       String icon,

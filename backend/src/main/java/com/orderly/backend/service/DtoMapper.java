@@ -26,7 +26,7 @@ final class DtoMapper {
         user.getId(),
         user.getEmail(),
         user.getUsername(),
-        user.getAuthProviderId(),
+        user.getKeycloakId(),
         user.getCreatedAt(),
         user.getUpdatedAt()
     );

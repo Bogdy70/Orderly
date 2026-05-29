@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orderly.backend.config.OrderlySecurityProperties;
 import com.orderly.backend.dto.BlockDtos;
 import com.orderly.backend.entity.BlockType;
 import com.orderly.backend.service.BlockConversionService;
@@ -20,12 +21,14 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(BlockController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class BlockControllerTest {
   @Autowired
   private MockMvc mockMvc;
@@ -41,6 +44,9 @@ class BlockControllerTest {
 
   @MockBean
   private BlockConversionService blockConversionService;
+
+  @MockBean
+  private OrderlySecurityProperties orderlySecurityProperties;
 
   @Test
   void createsBlockOnNestedSpaceRoute() throws Exception {

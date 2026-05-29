@@ -13,11 +13,8 @@ public class UserEntity extends BaseEntity {
   @Column(nullable = false, unique = true)
   private String username;
 
-  @Column(name = "password_hash")
-  private String passwordHash;
-
-  @Column(name = "auth_provider_id")
-  private String authProviderId;
+  @Column(name = "keycloak_id", nullable = false, unique = true)
+  private String keycloakId;
 
   public String getEmail() {
     return email;
@@ -35,19 +32,11 @@ public class UserEntity extends BaseEntity {
     this.username = username;
   }
 
-  public String getPasswordHash() {
-    return passwordHash;
+  public String getKeycloakId() {
+    return keycloakId;
   }
 
-  public void setPasswordHash(String passwordHash) {
-    this.passwordHash = passwordHash;
-  }
-
-  public String getAuthProviderId() {
-    return authProviderId;
-  }
-
-  public void setAuthProviderId(String authProviderId) {
-    this.authProviderId = authProviderId;
+  public void setKeycloakId(String keycloakId) {
+    this.keycloakId = keycloakId;
   }
 }
