@@ -117,13 +117,20 @@ class UserServiceTest {
   }
 
   @Test
-  void currentUserFailsWhenLocalUserWasNotConnected() {
+  void currentUserCreatesLocalUserWhenMissing() {
     UserService userService = new UserService(userRepository, securityIdentityService);
-    when(securityIdentityService.requireKeycloakSubject()).thenReturn("missing-sub");
-    when(userRepository.findByKeycloakId("missing-sub")).thenReturn(Optional.empty());
+    when(securityIdentityService.requireKeycloakSubject()).thenReturn("new-sub");
+    when(securityIdentityService.findEmailClaim()).thenReturn(Optional.of("new@orderly.local"));
+    when(securityIdentityService.findPreferredUsernameClaim()).thenReturn(Optional.of("new-user"));
+    when(userRepository.findByKeycloakId("new-sub")).thenReturn(Optional.empty());
+    when(userRepository.findByEmail("new@orderly.local")).thenReturn(Optional.empty());
+    when(userRepository.existsByUsername("new-user")).thenReturn(false);
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    assertThatThrownBy(userService::currentUser)
-        .isInstanceOf(ApiException.class)
-        .hasMessageContaining("POST /api/users");
+    UserDtos.UserResponse response = userService.currentUser();
+
+    assertThat(response.email()).isEqualTo("new@orderly.local");
+    assertThat(response.username()).isEqualTo("new-user");
+    assertThat(response.keycloakId()).isEqualTo("new-sub");
   }
 }

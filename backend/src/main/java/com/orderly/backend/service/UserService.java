@@ -58,9 +58,8 @@ public class UserService {
     return DtoMapper.toUser(getEntity(id));
   }
 
-  @Transactional(readOnly = true)
   public UserDtos.UserResponse currentUser() {
-    return DtoMapper.toUser(getCurrentUserEntity());
+    return DtoMapper.toUser(getOrCreateCurrentUserEntity());
   }
 
   public UserDtos.UserResponse update(Long id, UserDtos.UpdateUserRequest request) {
@@ -81,9 +80,44 @@ public class UserService {
   }
 
   public UserEntity getCurrentUserEntity() {
+    return getOrCreateCurrentUserEntity();
+  }
+
+  private UserEntity getOrCreateCurrentUserEntity() {
     String keycloakId = securityIdentityService.requireKeycloakSubject();
     return userRepository.findByKeycloakId(keycloakId)
-        .orElseThrow(() -> ApiException.notFound("Local Orderly user not found. Create it with POST /api/users first."));
+        .orElseGet(() -> findOrCreateByVerifiedEmail(keycloakId));
+  }
+
+  private UserEntity findOrCreateByVerifiedEmail(String keycloakId) {
+    String email = securityIdentityService.findEmailClaim()
+        .map(value -> value.trim().toLowerCase())
+        .filter(value -> !value.isBlank())
+        .orElseThrow(() -> ApiException.badRequest("Authenticated Keycloak account is missing an email claim."));
+    String preferredUsername = securityIdentityService.findPreferredUsernameClaim()
+        .map(String::trim)
+        .filter(value -> !value.isBlank())
+        .orElseGet(() -> email.substring(0, email.indexOf('@')));
+
+    return userRepository.findByEmail(email)
+        .map(user -> {
+          user.setKeycloakId(keycloakId);
+          if (user.getUsername() == null || user.getUsername().isBlank()) {
+            user.setUsername(preferredUsername);
+          }
+          return userRepository.save(user);
+        })
+        .orElseGet(() -> {
+          String username = preferredUsername;
+          if (userRepository.existsByUsername(username)) {
+            username = username + "-" + keycloakId.substring(0, Math.min(8, keycloakId.length()));
+          }
+          UserEntity user = new UserEntity();
+          user.setKeycloakId(keycloakId);
+          user.setEmail(email);
+          user.setUsername(username);
+          return userRepository.save(user);
+        });
   }
 
   private String resolveEmail(String requestedEmail) {

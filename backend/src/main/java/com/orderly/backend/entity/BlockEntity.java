@@ -23,6 +23,18 @@ public class BlockEntity extends BaseEntity {
   @Column(nullable = false)
   private Integer position = 0;
 
+  @Column(nullable = false)
+  private Double x;
+
+  @Column(nullable = false)
+  private Double y;
+
+  @Column(nullable = false)
+  private Double width;
+
+  @Column(nullable = false)
+  private Double height;
+
   public SpaceEntity getSpace() {
     return space;
   }
@@ -53,5 +65,37 @@ public class BlockEntity extends BaseEntity {
 
   public void setPosition(Integer position) {
     this.position = position;
+  }
+
+  public Double getX() {
+    return x;
+  }
+
+  public void setX(Double x) {
+    this.x = x;
+  }
+
+  public Double getY() {
+    return y;
+  }
+
+  public void setY(Double y) {
+    this.y = y;
+  }
+
+  public Double getWidth() {
+    return width;
+  }
+
+  public void setWidth(Double width) {
+    this.width = width;
+  }
+
+  public Double getHeight() {
+    return height;
+  }
+
+  public void setHeight(Double height) {
+    this.height = height;
   }
 }

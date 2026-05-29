@@ -1,816 +1,796 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  buildProjectXml,
-  clearStoredUser,
-  createProject,
-  deleteCustomProject,
-  downloadTextFile,
-  loadProjects,
-  loadStoredUser,
-  persistProject,
-  sanitizeFileName,
-  saveStoredUser
-} from "./services/projectStore.js";
+  clearToken,
+  createBlock,
+  createChecklistItem,
+  createDiagram,
+  createDiagramEdge,
+  createDiagramNode,
+  createSpace,
+  createTableRow,
+  decodeToken,
+  deleteBlock,
+  deleteChecklistItem,
+  deleteDiagramEdge,
+  deleteDiagramNode,
+  deleteSpace,
+  deleteTableRow,
+  getCurrentUser,
+  getSpaceFull,
+  isAuthenticated,
+  listSpaces,
+  login,
+  registerAccount,
+  updateBlock,
+  updateChecklistItem,
+  updateDiagramNode,
+  updateTableRow
+} from "./services/api.js";
 
-const EMPTY_PROJECT_FORM = {
-  title: "",
-  category: "",
-  owner: "",
-  description: ""
-};
-
-const EMPTY_TASK_FORM = {
-  task: "",
-  status: "Pending",
-  priority: "Low"
-};
+const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb" };
+const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
+const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
 
 function App() {
-  const route = getRoute();
+  const [route, setRoute] = useState(getRoute());
 
   useEffect(() => {
-    document.title = route.title;
-  }, [route.title]);
-
-  if (route.page === "login") return <LoginPage />;
-  if (route.page === "dashboard") return <DashboardPage />;
-  if (route.page === "project") return <ProjectPage projectId={route.projectId} />;
-  return <HomePage />;
-}
-
-function HomePage() {
-  return (
-    <>
-      <PublicNav />
-      <main>
-        <section className="hero-section">
-          <div className="page-shell hero-grid">
-            <div className="hero-copy">
-              <span className="eyebrow">Organization workspace</span>
-              <h1>Organize your ideas, lists and next steps in one place</h1>
-              <p>
-                Capture thoughts as they come up, sort them into clear lists, and keep every plan easy to follow.
-              </p>
-              <div className="button-row">
-                <a className="button primary large" href="dashboard.html">View workspace</a>
-                <a className="button secondary large" href="project.html?id=1">See sample space</a>
-              </div>
-            </div>
-
-            <div className="workspace-preview" aria-label="Orderly preview">
-              <div className="preview-header">
-                <div>
-                  <span className="muted-label">Today</span>
-                  <strong>Launch Week Plan</strong>
-                </div>
-                <span className="status-dot">3 active</span>
-              </div>
-              <div className="preview-list">
-                <PreviewItem checked label="Confirm launch goals" />
-                <PreviewItem checked label="Collect final assets" />
-                <PreviewItem label="Review launch timeline" />
-                <PreviewItem label="Send kickoff update" />
-              </div>
-              <div className="preview-table">
-                <div className="table-row header">
-                  <span>Action</span>
-                  <span>Status</span>
-                  <span>Priority</span>
-                </div>
-                <div className="table-row">
-                  <span>Review blockers</span>
-                  <Pill tone="blue">In progress</Pill>
-                  <Pill tone="red">High</Pill>
-                </div>
-                <div className="table-row">
-                  <span>Prepare recap</span>
-                  <Pill tone="gray">Pending</Pill>
-                  <Pill tone="cyan">Low</Pill>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="band">
-          <div className="page-shell info-grid">
-            <InfoBlock title="Collect everything">
-              Bring ideas, reminders and unfinished thoughts into one clear starting point.
-            </InfoBlock>
-            <InfoBlock title="Shape a plan">
-              Break bigger goals into lists, tasks and priorities that feel manageable.
-            </InfoBlock>
-            <InfoBlock title="Keep moving">
-              Pick up where you left off and keep your work organized without extra clutter.
-            </InfoBlock>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </>
-  );
-}
-
-function LoginPage() {
-  const [form, setForm] = useState({ username: "", password: "" });
-
-  function handleSubmit(event) {
-    event.preventDefault();
-
-    const username = form.username.trim();
-    const password = form.password.trim();
-
-    if (!username || !password) {
-      alert("Please fill in both fields.");
-      return;
-    }
-
-    saveStoredUser(username);
-    window.location.href = "dashboard.html";
-  }
-
-  return (
-    <>
-      <PublicNav compact />
-      <main className="center-page">
-        <section className="auth-panel">
-          <div className="panel-heading centered">
-            <h1>Open your workspace</h1>
-            <p>Sign in to continue organizing your ideas and priorities.</p>
-          </div>
-
-          <form className="stacked-form" onSubmit={handleSubmit}>
-            <label>
-              <span>Name</span>
-              <input
-                type="text"
-                placeholder="Your name"
-                value={form.username}
-                onChange={event => setForm({ ...form, username: event.target.value })}
-                required
-              />
-            </label>
-
-            <label>
-              <span>Password</span>
-              <input
-                type="password"
-                placeholder="Password"
-                value={form.password}
-                onChange={event => setForm({ ...form, password: event.target.value })}
-                required
-              />
-            </label>
-
-            <button className="button primary full-width" type="submit">Log in</button>
-          </form>
-        </section>
-      </main>
-    </>
-  );
-}
-
-function DashboardPage() {
-  const [projects, setProjects] = useState([]);
-  const [query, setQuery] = useState("");
-  const [form, setForm] = useState(EMPTY_PROJECT_FORM);
-  const [loadError, setLoadError] = useState(false);
-
-  async function refreshProjects() {
-    try {
-      setProjects(await loadProjects());
-      setLoadError(false);
-    } catch (error) {
-      setLoadError(true);
-    }
-  }
-
-  useEffect(() => {
-    refreshProjects();
+    const onPop = () => setRoute(getRoute());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const filteredProjects = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return projects;
-
-    return projects.filter(project =>
-      project.title.toLowerCase().includes(normalizedQuery) ||
-      project.category.toLowerCase().includes(normalizedQuery)
-    );
-  }, [projects, query]);
-
-  function handleCreateProject(event) {
-    event.preventDefault();
-
-    const nextProject = {
-      title: form.title.trim(),
-      category: form.category.trim(),
-      owner: form.owner.trim(),
-      description: form.description.trim()
-    };
-
-    if (!nextProject.title || !nextProject.category || !nextProject.owner || !nextProject.description) {
-      alert("Please fill in all fields.");
-      return;
-    }
-
-    createProject(nextProject);
-    setForm(EMPTY_PROJECT_FORM);
-    refreshProjects();
+  function navigate(path) {
+    window.history.pushState({}, "", path);
+    setRoute(getRoute());
   }
 
-  function handleDeleteProject(project) {
-    if (project.source !== "custom") {
-      alert("Only spaces you created can be deleted.");
+  if (route.page === "login") return <LoginPage navigate={navigate} />;
+  if (route.page === "dashboard") return <DashboardPage navigate={navigate} />;
+  if (route.page === "space") return <SpacePage navigate={navigate} spaceId={route.spaceId} />;
+  return <RegisterPage navigate={navigate} />;
+}
+
+function RegisterPage({ navigate }) {
+  const [form, setForm] = useState({ email: "", username: "", password: "", confirmPassword: "" });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    const payload = {
+      email: form.email.trim().toLowerCase(),
+      username: form.username.trim(),
+      password: form.password
+    };
+    const errors = validateRegistration({ ...payload, confirmPassword: form.confirmPassword });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setMessage("Check the highlighted fields.");
       return;
     }
 
-    if (!confirm(`Delete space "${project.title}"?`)) return;
-
-    deleteCustomProject(project.id);
-    refreshProjects();
+    setBusy(true);
+    setMessage("");
+    try {
+      await registerAccount(payload);
+      await login(payload.username, payload.password);
+      await getCurrentUser();
+      navigate("/dashboard.html");
+    } catch (error) {
+      if (error.data?.fields) setFieldErrors(error.data.fields);
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <>
-      <WorkspaceNav />
-      <main className="workspace-page">
-        <div className="page-shell">
-          <div className="page-heading with-actions">
-            <div>
-              <h1>Your spaces</h1>
-              <p>Keep ideas, lists and priorities organized in one clear workspace.</p>
-            </div>
-            <input
-              className="search-input"
-              type="search"
-              placeholder="Search by name or category..."
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-            />
-          </div>
-
-          {loadError && <Alert tone="warning">Spaces could not be loaded.</Alert>}
-
-          <section className="panel">
-            <div className="panel-heading">
-              <h2>Create a new space</h2>
-              <p>Start with a blank space, then add a checklist or action list when you are ready.</p>
-            </div>
-
-            <form className="project-form" onSubmit={handleCreateProject}>
-              <label>
-                <span>Space name</span>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={event => setForm({ ...form, title: event.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                <span>Category</span>
-                <input
-                  type="text"
-                  placeholder="Planning, Personal, Team..."
-                  value={form.category}
-                  onChange={event => setForm({ ...form, category: event.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                <span>Lead</span>
-                <input
-                  type="text"
-                  value={form.owner}
-                  onChange={event => setForm({ ...form, owner: event.target.value })}
-                  required
-                />
-              </label>
-              <label className="wide">
-                <span>Summary</span>
-                <textarea
-                  rows="3"
-                  value={form.description}
-                  onChange={event => setForm({ ...form, description: event.target.value })}
-                  required
-                />
-              </label>
-              <button className="button primary form-action" type="submit">Create space</button>
-            </form>
-          </section>
-
-          <ProjectGrid projects={filteredProjects} onDelete={handleDeleteProject} />
+    <main className="auth-layout">
+      <section className="auth-copy">
+        <span className="eyebrow">Orderly</span>
+        <h1>Spaces for plans, lists, tables, and visual diagrams.</h1>
+        <p>Create a space for every project, then add movable blocks that fit the work: checklists for steps, tables for structured tasks, and diagrams for mapping ideas.</p>
+        <div className="feature-strip">
+          <span>Multiple spaces</span>
+          <span>Block canvas</span>
+          <span>Live diagrams</span>
         </div>
-      </main>
-    </>
+      </section>
+      <section className="auth-card">
+        <h2>Create your account</h2>
+        <form className="form-stack" onSubmit={submit} noValidate>
+          <Field label="Email" value={form.email} onChange={email => setForm({ ...form, email })} type="email" error={fieldErrors.email} autoComplete="email" />
+          <Field label="Username" value={form.username} onChange={username => setForm({ ...form, username })} error={fieldErrors.username} autoComplete="username" />
+          <Field label="Password" value={form.password} onChange={password => setForm({ ...form, password })} type="password" error={fieldErrors.password} autoComplete="new-password" />
+          <Field label="Confirm password" value={form.confirmPassword} onChange={confirmPassword => setForm({ ...form, confirmPassword })} type="password" error={fieldErrors.confirmPassword} autoComplete="new-password" />
+          <button className="button primary" disabled={busy}>{busy ? "Creating account..." : "Register"}</button>
+        </form>
+        {message && <p className="form-message">{message}</p>}
+        <button className="link-button" onClick={() => navigate("/login.html")}>Already have an account? Log in</button>
+      </section>
+    </main>
   );
 }
 
-function ProjectPage({ projectId }) {
-  const [project, setProject] = useState(null);
-  const [loadState, setLoadState] = useState("loading");
-  const [checklistForm, setChecklistForm] = useState({ text: "", editingIndex: null });
-  const [taskForm, setTaskForm] = useState({ ...EMPTY_TASK_FORM, editingIndex: null });
+function LoginPage({ navigate }) {
+  const [form, setForm] = useState({ username: "", password: "" });
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+      setMessage("");
+    try {
+      await login(form.username, form.password);
+      await getCurrentUser();
+      navigate("/dashboard.html");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="auth-layout compact">
+      <section className="auth-card">
+        <h1>Log in</h1>
+        <form className="form-stack" onSubmit={submit}>
+          <Field label="Email or username" value={form.username} onChange={username => setForm({ ...form, username })} />
+          <Field label="Password" value={form.password} onChange={password => setForm({ ...form, password })} type="password" />
+          <button className="button primary" disabled={busy}>{busy ? "Signing in..." : "Log in"}</button>
+        </form>
+        {message && <p className="form-message">{message}</p>}
+        <button className="link-button" onClick={() => navigate("/")}>Need an account? Register</button>
+      </section>
+    </main>
+  );
+}
+
+function DashboardPage({ navigate }) {
+  const [spaces, setSpaces] = useState([]);
+  const [user, setUser] = useState(null);
+  const [form, setForm] = useState(EMPTY_SPACE);
+  const [query, setQuery] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    async function loadProject() {
-      try {
-        const projects = await loadProjects();
-        const selectedProject = projects.find(item => String(item.id) === String(projectId));
+    requireAuth(navigate);
+    refresh();
+  }, []);
 
-        if (!selectedProject) {
-          setLoadState("not-found");
-          return;
-        }
-
-        setProject(selectedProject);
-        setLoadState("ready");
-        document.title = `Orderly | ${selectedProject.title}`;
-      } catch (error) {
-        setLoadState("error");
-      }
-    }
-
-    loadProject();
-  }, [projectId]);
-
-  function updateProject(updater) {
-    setProject(currentProject => {
-      const updatedProject = updater(structuredClone(currentProject));
-      persistProject(updatedProject);
-      return updatedProject;
-    });
-  }
-
-  if (loadState === "loading") {
-    return (
-      <>
-        <ProjectNav />
-        <main className="workspace-page">
-          <div className="page-shell">
-            <Alert>Opening space...</Alert>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  if (loadState === "not-found" || loadState === "error") {
-    return (
-      <>
-        <ProjectNav />
-        <main className="workspace-page">
-          <div className="page-shell">
-            <Alert tone="danger">
-              {loadState === "not-found" ? "Space not found." : "This space could not be opened."}
-            </Alert>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  const isCustom = project.source === "custom";
-  const hasChecklist = Array.isArray(project.checklist);
-  const hasTasks = Array.isArray(project.tasks);
-
-  function addChecklistSection() {
-    if (!isCustom || hasChecklist) return;
-    updateProject(currentProject => ({ ...currentProject, checklist: [] }));
-  }
-
-  function addTaskSection() {
-    if (!isCustom || hasTasks) return;
-    updateProject(currentProject => ({ ...currentProject, tasks: [] }));
-  }
-
-  function handleChecklistSubmit(event) {
-    event.preventDefault();
-    const text = checklistForm.text.trim();
-    if (!text || !hasChecklist) return;
-
-    updateProject(currentProject => {
-      if (checklistForm.editingIndex !== null) {
-        currentProject.checklist[checklistForm.editingIndex].text = text;
-      } else {
-        currentProject.checklist.push({ text, done: false });
-      }
-      return currentProject;
-    });
-    resetChecklistForm();
-  }
-
-  function resetChecklistForm() {
-    setChecklistForm({ text: "", editingIndex: null });
-  }
-
-  function handleTaskSubmit(event) {
-    event.preventDefault();
-    const task = taskForm.task.trim();
-    if (!task || !hasTasks) return;
-
-    const row = {
-      task,
-      status: taskForm.status,
-      priority: taskForm.priority
-    };
-
-    updateProject(currentProject => {
-      if (taskForm.editingIndex !== null) {
-        currentProject.tasks[taskForm.editingIndex] = row;
-      } else {
-        currentProject.tasks.push(row);
-      }
-      return currentProject;
-    });
-    resetTaskForm();
-  }
-
-  function resetTaskForm() {
-    setTaskForm({ ...EMPTY_TASK_FORM, editingIndex: null });
-  }
-
-  function exportProject() {
+  async function refresh() {
     try {
-      const xml = buildProjectXml(project);
-      downloadTextFile(`${sanitizeFileName(project.title)}-${project.id}.xml`, xml, "application/xml;charset=utf-8");
+      setUser(await getCurrentUser());
+      setSpaces(await listSpaces());
     } catch (error) {
-      alert("Could not export this space.");
+      setMessage(error.message);
     }
   }
 
+  async function submit(event) {
+    event.preventDefault();
+    const payload = { ...form, name: form.name.trim(), description: form.description.trim() };
+    if (!payload.name) return;
+    await createSpace(payload);
+    setForm(EMPTY_SPACE);
+    refresh();
+  }
+
+  async function removeSpace(space) {
+    if (!confirm(`Delete ${space.name}?`)) return;
+    await deleteSpace(space.id);
+    refresh();
+  }
+
+  const visibleSpaces = spaces.filter(space => `${space.name} ${space.description}`.toLowerCase().includes(query.toLowerCase()));
+
   return (
-    <>
-      <ProjectNav />
-      <main className="workspace-page">
-        <div className="page-shell">
-          <section className="space-header">
-            <div>
-              <div className="badge-row">
-                <Pill tone="orange">{project.category}</Pill>
-                {isCustom && <Pill tone="amber">Editable space</Pill>}
-              </div>
-              <h1>{project.title}</h1>
-              <p>{project.description}</p>
-            </div>
-            <aside className="space-meta">
-              <span className="muted-label">Lead</span>
-              <strong>{project.owner}</strong>
-              <span className="muted-label">Space type</span>
-              <strong>{isCustom ? "Personal space" : "Starter space"}</strong>
-              <button className="button secondary small" type="button" onClick={exportProject}>Export space</button>
-            </aside>
-          </section>
-
-          {isCustom && (
-            <section className="panel setup-panel">
-              <div className="panel-heading">
-                <h2>Set up this space</h2>
-                <p>Choose the first section you want to add to this space.</p>
-              </div>
-              <div className="button-row">
-                <button className="button secondary" type="button" onClick={addChecklistSection} disabled={hasChecklist}>
-                  Add checklist
-                </button>
-                <button className="button secondary" type="button" onClick={addTaskSection} disabled={hasTasks}>
-                  Add action list
-                </button>
-              </div>
-            </section>
-          )}
-
-          <div className={`section-grid ${hasChecklist && !hasTasks ? "single" : ""} ${hasTasks && !hasChecklist ? "single" : ""}`}>
-            {hasChecklist && (
-              <section className="panel">
-                <div className="panel-heading inline">
-                  <h2>Checklist</h2>
-                </div>
-
-                {isCustom && (
-                  <form className="inline-form" onSubmit={handleChecklistSubmit}>
-                    <input
-                      type="text"
-                      placeholder="Add checklist item"
-                      value={checklistForm.text}
-                      onChange={event => setChecklistForm({ ...checklistForm, text: event.target.value })}
-                    />
-                    <button className="button primary" type="submit">
-                      {checklistForm.editingIndex !== null ? "Save" : "Add"}
-                    </button>
-                    {checklistForm.editingIndex !== null && (
-                      <button className="button ghost" type="button" onClick={resetChecklistForm}>Cancel edit</button>
-                    )}
-                  </form>
-                )}
-
-                {project.checklist.length === 0 && <Alert>No checklist items yet.</Alert>}
-
-                <ul className="checklist">
-                  {project.checklist.map((item, index) => (
-                    <li key={`${item.text}-${index}`}>
-                      <label className="check-row">
-                        <input
-                          type="checkbox"
-                          checked={item.done}
-                          disabled={!isCustom}
-                          onChange={() => updateProject(currentProject => {
-                            currentProject.checklist[index].done = !currentProject.checklist[index].done;
-                            return currentProject;
-                          })}
-                        />
-                        <span className={item.done ? "done" : ""}>{item.text}</span>
-                      </label>
-                      {isCustom && (
-                        <div className="row-actions">
-                          <button
-                            className="icon-button"
-                            type="button"
-                            title="Edit item"
-                            aria-label="Edit item"
-                            onClick={() => setChecklistForm({ text: item.text, editingIndex: index })}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="icon-button danger"
-                            type="button"
-                            title="Delete item"
-                            aria-label="Delete item"
-                            onClick={() => {
-                              updateProject(currentProject => {
-                                currentProject.checklist.splice(index, 1);
-                                return currentProject;
-                              });
-                              resetChecklistForm();
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {hasTasks && (
-              <section className="panel wide-panel">
-                <div className="panel-heading inline">
-                  <h2>Action List</h2>
-                </div>
-
-                {isCustom && (
-                  <form className="task-form" onSubmit={handleTaskSubmit}>
-                    <input
-                      type="text"
-                      placeholder="Action item"
-                      value={taskForm.task}
-                      onChange={event => setTaskForm({ ...taskForm, task: event.target.value })}
-                    />
-                    <select
-                      value={taskForm.status}
-                      onChange={event => setTaskForm({ ...taskForm, status: event.target.value })}
-                    >
-                      <option>Pending</option>
-                      <option>In progress</option>
-                      <option>Done</option>
-                    </select>
-                    <select
-                      value={taskForm.priority}
-                      onChange={event => setTaskForm({ ...taskForm, priority: event.target.value })}
-                    >
-                      <option>Low</option>
-                      <option>Medium</option>
-                      <option>High</option>
-                    </select>
-                    <button className="button primary" type="submit">
-                      {taskForm.editingIndex !== null ? "Save" : "Add"}
-                    </button>
-                    {taskForm.editingIndex !== null && (
-                      <button className="button ghost" type="button" onClick={resetTaskForm}>Cancel edit</button>
-                    )}
-                  </form>
-                )}
-
-                {project.tasks.length === 0 && <Alert>No action items yet.</Alert>}
-
-                <div className="responsive-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Action</th>
-                        <th>Status</th>
-                        <th>Priority</th>
-                        <th className="actions-column">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {project.tasks.map((row, index) => (
-                        <tr key={`${row.task}-${index}`}>
-                          <td>{row.task}</td>
-                          <td><Pill tone={statusTone(row.status)}>{row.status}</Pill></td>
-                          <td><Pill tone={priorityTone(row.priority)}>{row.priority}</Pill></td>
-                          <td>
-                            {isCustom && (
-                              <div className="table-actions">
-                                <button
-                                  className="button secondary small"
-                                  type="button"
-                                  onClick={() => setTaskForm({ ...row, editingIndex: index })}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  className="button danger small"
-                                  type="button"
-                                  onClick={() => {
-                                    updateProject(currentProject => {
-                                      currentProject.tasks.splice(index, 1);
-                                      return currentProject;
-                                    });
-                                    resetTaskForm();
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-          </div>
+    <AppShell user={user} navigate={navigate}>
+      <section className="page-heading">
+        <div>
+          <h1>Your spaces</h1>
+          <p>Open a workspace or create a new one for a project, routine, or plan.</p>
         </div>
-      </main>
-    </>
-  );
-}
-
-function ProjectGrid({ projects, onDelete }) {
-  if (!projects.length) {
-    return (
-      <section className="empty-state">
-        <h2>No spaces found</h2>
-        <p>Try another search term or create a new space.</p>
+        <input placeholder="Search spaces" value={query} onChange={event => setQuery(event.target.value)} />
       </section>
-    );
+
+      <section className="panel">
+        <h2>Create space</h2>
+        <form className="space-form" onSubmit={submit}>
+          <Field label="Name" value={form.name} onChange={name => setForm({ ...form, name })} />
+          <Field label="Description" value={form.description} onChange={description => setForm({ ...form, description })} />
+          <Field label="Icon" value={form.icon} onChange={icon => setForm({ ...form, icon })} />
+          <label>
+            <span>Color</span>
+            <input type="color" value={form.color} onChange={event => setForm({ ...form, color: event.target.value })} />
+          </label>
+          <button className="button primary">Create</button>
+        </form>
+      </section>
+
+      {message && <Alert>{message}</Alert>}
+      <section className="space-grid">
+        {visibleSpaces.map(space => (
+          <article className="space-card" key={space.id} style={{ borderTopColor: space.color || "#2563eb" }}>
+            <div className="space-icon">{space.icon || "space"}</div>
+            <h2>{space.name}</h2>
+            <p>{space.description || "No description yet."}</p>
+            <div className="card-actions">
+              <button className="button primary" onClick={() => navigate(`/project.html?id=${space.id}`)}>Open</button>
+              <button className="button danger" onClick={() => removeSpace(space)}>Delete</button>
+            </div>
+          </article>
+        ))}
+      </section>
+    </AppShell>
+  );
+}
+
+function SpacePage({ navigate, spaceId }) {
+  const [space, setSpace] = useState(null);
+  const [blocks, setBlocks] = useState([]);
+  const [blockForm, setBlockForm] = useState(EMPTY_BLOCK);
+  const [draggedBlockId, setDraggedBlockId] = useState(null);
+  const [dropTargetId, setDropTargetId] = useState(null);
+
+  useEffect(() => {
+    requireAuth(navigate);
+    refresh();
+  }, [spaceId]);
+
+  async function refresh() {
+    const data = await getSpaceFull(spaceId);
+    setSpace(data.space);
+    setBlocks(data.blocks || []);
+  }
+
+  async function addBlock(event) {
+    event.preventDefault();
+    const title = blockForm.title.trim() || titleFor(blockForm.type);
+    const position = blocks.length + 1;
+    const block = await createBlock(spaceId, { ...blockForm, title, position });
+    if (block.type === "diagram") await createDiagram(block.id);
+    setBlockForm(EMPTY_BLOCK);
+    refresh();
+  }
+
+  const orderedBlocks = [...blocks].sort((left, right) =>
+    (left.block.position ?? 0) - (right.block.position ?? 0) || left.block.id - right.block.id
+  );
+
+  function startReorder(event, blockId) {
+    setDraggedBlockId(blockId);
+    setDropTargetId(blockId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(blockId));
+  }
+
+  function allowDrop(event, blockId) {
+    event.preventDefault();
+    if (draggedBlockId && draggedBlockId !== blockId) {
+      setDropTargetId(blockId);
+    }
+  }
+
+  async function reorderBlocks(sourceId, targetId) {
+    setDraggedBlockId(null);
+    setDropTargetId(null);
+    if (!sourceId || !targetId || sourceId === targetId) return;
+
+    const sourceIndex = orderedBlocks.findIndex(item => item.block.id === sourceId);
+    const targetIndex = orderedBlocks.findIndex(item => item.block.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const next = [...orderedBlocks];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    const positioned = next.map((item, index) => ({
+      ...item,
+      block: { ...item.block, position: index + 1 }
+    }));
+
+    setBlocks(positioned);
+    await Promise.all(positioned.map(item => updateBlock(item.block.id, { position: item.block.position })));
+    refresh();
   }
 
   return (
-    <section className="project-grid">
-      {projects.map(project => (
-        <article className="project-card" key={`${project.source}-${project.id}`}>
-          <div className="card-topline">
-            <Pill tone="orange">{project.category}</Pill>
-            <span className="muted-label">
-              {project.source === "custom" ? "Your space" : "Starter space"} #{project.id}
-            </span>
-          </div>
-          <h2>{project.title}</h2>
-          <p>{project.description}</p>
-          <div className="card-owner">Lead: <strong>{project.owner}</strong></div>
-          <div className="card-actions">
-            <a className="button primary" href={`project.html?id=${encodeURIComponent(project.id)}`}>Open space</a>
-            {project.source === "custom" && (
-              <button className="button danger" type="button" onClick={() => onDelete(project)}>Delete</button>
-            )}
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function PublicNav({ compact = false }) {
-  return (
-    <header className="topbar">
-      <nav className="page-shell nav-content">
-        <a className="brand" href="index.html">Orderly</a>
-        <div className="nav-actions">
-          {compact ? (
-            <a className="button secondary small" href="index.html">Back</a>
-          ) : (
-            <>
-              <a className="button secondary small" href="login.html">Log in</a>
-              <a className="button primary small" href="dashboard.html">Open workspace</a>
-            </>
-          )}
+    <AppShell navigate={navigate}>
+      <section className="space-title">
+        <button className="button secondary" onClick={() => navigate("/dashboard.html")}>Back</button>
+        <div>
+          <h1>{space?.name || "Space"}</h1>
+          <p>{space?.description}</p>
         </div>
-      </nav>
-    </header>
+      </section>
+
+      <section className="panel">
+        <form className="block-form" onSubmit={addBlock}>
+          <label>
+            <span>Block type</span>
+            <select value={blockForm.type} onChange={event => setBlockForm({ ...blockForm, type: event.target.value })}>
+              <option value="checklist">Checklist</option>
+              <option value="table">Table</option>
+              <option value="diagram">Diagram</option>
+            </select>
+          </label>
+          <Field label="Title" value={blockForm.title} onChange={title => setBlockForm({ ...blockForm, title })} />
+          <button className="button primary">Add block</button>
+        </form>
+      </section>
+
+      <section
+        className="block-grid"
+        onDragOver={event => event.preventDefault()}
+        onDrop={event => {
+          if (event.target !== event.currentTarget) return;
+          event.preventDefault();
+          const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggedBlockId;
+          const lastBlock = orderedBlocks[orderedBlocks.length - 1];
+          if (lastBlock) reorderBlocks(sourceId, lastBlock.block.id);
+        }}
+      >
+        {orderedBlocks.map(item => (
+          <article
+            className={`block-card block-${item.block.type} ${draggedBlockId === item.block.id ? "dragging" : ""} ${dropTargetId === item.block.id && draggedBlockId !== item.block.id ? "drop-target" : ""}`}
+            key={item.block.id}
+            onDragOver={event => allowDrop(event, item.block.id)}
+            onDrop={event => {
+              event.preventDefault();
+              const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggedBlockId;
+              reorderBlocks(sourceId, item.block.id);
+            }}
+          >
+            <header
+              className="block-header"
+              draggable
+              onDragStart={event => startReorder(event, item.block.id)}
+              onDragEnd={() => {
+                setDraggedBlockId(null);
+                setDropTargetId(null);
+              }}
+            >
+              <div>
+                <span>{item.block.type}</span>
+                <h2>{item.block.title}</h2>
+              </div>
+              <button className="button danger small" draggable="false" onDragStart={event => event.stopPropagation()} onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+            </header>
+            {item.block.type === "checklist" && <ChecklistBlock block={item.block} items={item.content || []} refresh={refresh} />}
+            {item.block.type === "table" && <TableBlock block={item.block} rows={item.content || []} refresh={refresh} />}
+            {item.block.type === "diagram" && <DiagramBlock block={item.block} content={item.content} refresh={refresh} />}
+          </article>
+        ))}
+      </section>
+    </AppShell>
   );
 }
 
-function WorkspaceNav() {
-  const username = loadStoredUser() || "Guest";
+function ChecklistBlock({ block, items, refresh }) {
+  const [text, setText] = useState("");
+  const [editingItem, setEditingItem] = useState(null);
 
-  function logout() {
-    clearStoredUser();
-    window.location.href = "index.html";
+  function editItem(item) {
+    setEditingItem(item);
+    setText(item.text);
+  }
+
+  function clearEdit() {
+    setEditingItem(null);
+    setText("");
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const nextText = text.trim();
+    if (!nextText) return;
+    if (editingItem) {
+      await updateChecklistItem(editingItem.id, { text: nextText });
+    } else {
+      await createChecklistItem(block.id, { text: nextText, done: false, position: items.length + 1 });
+    }
+    clearEdit();
+    refresh();
   }
 
   return (
-    <header className="topbar">
-      <nav className="page-shell nav-content">
-        <a className="brand" href="index.html">Orderly</a>
-        <div className="nav-actions">
-          <span className="hello">Hello, <strong>{username}</strong></span>
-          <button className="button danger small" type="button" onClick={logout}>Log out</button>
-        </div>
-      </nav>
-    </header>
-  );
-}
-
-function ProjectNav() {
-  return (
-    <header className="topbar">
-      <nav className="page-shell nav-content">
-        <a className="brand" href="index.html">Orderly</a>
-        <a className="button secondary small" href="dashboard.html">Back to workspace</a>
-      </nav>
-    </header>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="footer">
-      <div className="page-shell footer-content">
-        <span>Orderly</span>
-        <span>Clear space for plans, notes and priorities.</span>
-      </div>
-    </footer>
-  );
-}
-
-function InfoBlock({ title, children }) {
-  return (
-    <article className="info-block">
-      <h2>{title}</h2>
-      <p>{children}</p>
-    </article>
-  );
-}
-
-function PreviewItem({ checked = false, label }) {
-  return (
-    <div className="preview-item">
-      <span className={checked ? "fake-checkbox checked" : "fake-checkbox"} />
-      <span className={checked ? "done" : ""}>{label}</span>
+    <div className="block-body">
+      <form className="inline-form editable-form" onSubmit={submit}>
+        <input placeholder="Checklist item" value={text} onChange={event => setText(event.target.value)} />
+        <button className="button primary small">{editingItem ? "Save" : "Add"}</button>
+        {editingItem && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
+      </form>
+      <ul className="checklist">
+        {items.map(item => (
+          <li key={item.id}>
+            <label>
+              <input type="checkbox" checked={item.done} onChange={() => updateChecklistItem(item.id, { done: !item.done }).then(refresh)} />
+              <span className={item.done ? "done" : ""}>{item.text}</span>
+            </label>
+            <div className="row-actions">
+              <button className="button secondary small" type="button" onClick={() => editItem(item)}>Edit</button>
+              <button className="text-danger" type="button" onClick={() => deleteChecklistItem(item.id).then(refresh)}>Delete</button>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function Pill({ tone = "gray", children }) {
-  return <span className={`pill ${tone}`}>{children}</span>;
+function TableBlock({ block, rows, refresh }) {
+  const [form, setForm] = useState({ title: "", status: "todo", priority: "low", dueDate: "" });
+  const [editingRow, setEditingRow] = useState(null);
+
+  function editRow(row) {
+    setEditingRow(row);
+    setForm({
+      title: row.title || "",
+      status: row.status || "todo",
+      priority: row.priority || "low",
+      dueDate: row.dueDate || ""
+    });
+  }
+
+  function clearEdit() {
+    setEditingRow(null);
+    setForm({ title: "", status: "todo", priority: "low", dueDate: "" });
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!form.title.trim()) return;
+    const payload = { ...form, title: form.title.trim(), priority: form.priority || "low", dueDate: form.dueDate || null };
+    if (editingRow) {
+      await updateTableRow(editingRow.id, payload);
+    } else {
+      await createTableRow(block.id, { ...payload, position: rows.length + 1 });
+    }
+    clearEdit();
+    refresh();
+  }
+  return (
+    <div className="block-body">
+      <form className="table-form" onSubmit={submit}>
+        <input placeholder="Row title" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} />
+        <select value={form.status} onChange={event => setForm({ ...form, status: event.target.value })}>
+          <option value="todo">todo</option>
+          <option value="pending">pending</option>
+          <option value="done">done</option>
+        </select>
+        <select value={form.priority || "low"} onChange={event => setForm({ ...form, priority: event.target.value })}>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
+        <input type="date" value={form.dueDate || ""} onChange={event => setForm({ ...form, dueDate: event.target.value })} />
+        <button className="button primary small">{editingRow ? "Save" : "Add"}</button>
+        {editingRow && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
+      </form>
+      <div className="rows">
+        {rows.length > 0 && (
+          <div className="data-row table-head">
+            <span>Task name</span>
+            <span>Status</span>
+            <span>Priority</span>
+            <span>Due date</span>
+            <span>Actions</span>
+          </div>
+        )}
+        {rows.map(row => (
+          <div className="data-row" key={row.id}>
+            <span className="row-title">{row.title}</span>
+            <span>{row.status}</span>
+            <span>{row.priority || "none"}</span>
+            <span>{row.dueDate || "no date"}</span>
+            <div className="row-actions">
+              <button className="button secondary small" type="button" onClick={() => editRow(row)}>Edit</button>
+              <button className="text-danger" type="button" onClick={() => deleteTableRow(row.id).then(refresh)}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function Alert({ tone = "neutral", children }) {
-  return <div className={`alert ${tone}`}>{children}</div>;
+function DiagramBlock({ block, content, refresh }) {
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [connectionNodes, setConnectionNodes] = useState([]);
+  const [selectedEdges, setSelectedEdges] = useState(new Set());
+  const [drag, setDrag] = useState(null);
+  const [draft, setDraft] = useState({ label: "", type: "task", color: "#2563eb" });
+  const diagram = content?.diagram;
+  const nodes = content?.nodes || [];
+  const edges = content?.edges || [];
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === "Backspace" && selectedEdges.size) {
+        event.preventDefault();
+        deleteSelectedEdges();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedEdges, edges]);
+
+  useEffect(() => {
+    if (!selectedNode) return;
+    const node = nodes.find(item => item.id === selectedNode);
+    if (!node) return;
+    const style = parseJson(node.styleJson);
+    setDraft({ label: node.label, type: node.type || "task", color: style.color || "#2563eb" });
+  }, [selectedNode]);
+
+  function selectNode(nodeId) {
+    setSelectedNode(nodeId);
+    setSelectedEdges(new Set());
+    setConnectionNodes(current => {
+      if (current.includes(nodeId)) return current;
+      return [...current, nodeId].slice(-2);
+    });
+  }
+
+  function clearNodeForm() {
+    setSelectedNode(null);
+    setSelectedEdges(new Set());
+    setConnectionNodes([]);
+    setDraft({ label: "", type: "task", color: "#2563eb" });
+  }
+
+  async function ensureDiagram() {
+    if (diagram) return diagram;
+    await createDiagram(block.id);
+    await refresh();
+    return null;
+  }
+
+  async function submitNode() {
+    if (selectedNode) {
+      await updateDiagramNode(selectedNode, {
+        label: draft.label || "New node",
+        type: draft.type,
+        styleJson: JSON.stringify({ color: draft.color })
+      });
+      refresh();
+      return;
+    }
+
+    const currentDiagram = await ensureDiagram();
+    if (!currentDiagram) return;
+    await createDiagramNode(currentDiagram.id, {
+      type: draft.type,
+      label: draft.label || "New node",
+      x: 60 + nodes.length * 28,
+      y: 70 + nodes.length * 28,
+      width: 150,
+      height: 76,
+      styleJson: JSON.stringify({ color: draft.color }),
+      dataJson: "{}"
+    });
+    setDraft({ label: "", type: "task", color: "#2563eb" });
+    refresh();
+  }
+
+  async function connectSelectedNodes() {
+    if (!diagram || connectionNodes.length !== 2 || connectionNodes[0] === connectionNodes[1]) return;
+    await createDiagramEdge(diagram.id, { sourceNodeId: connectionNodes[0], targetNodeId: connectionNodes[1], type: "arrow", label: "", styleJson: "{}" });
+    setConnectionNodes([]);
+    refresh();
+  }
+
+  async function removeNode() {
+    if (!selectedNode) return;
+    await deleteDiagramNode(selectedNode);
+    clearNodeForm();
+    setConnectionNodes(current => current.filter(id => id !== selectedNode));
+    refresh();
+  }
+
+  async function deleteSelectedEdges() {
+    await Promise.all([...selectedEdges].map(id => deleteDiagramEdge(id)));
+    setSelectedEdges(new Set());
+    refresh();
+  }
+
+  async function endDrag() {
+    if (!drag) return;
+    await updateDiagramNode(drag.id, { x: drag.x, y: drag.y });
+    setDrag(null);
+    refresh();
+  }
+
+  const renderedNodes = nodes.map(node => drag?.id === node.id ? { ...node, x: drag.x, y: drag.y } : node);
+
+  return (
+    <div className="diagram-shell">
+      <div className="diagram-tools">
+        <input placeholder="Node label" value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} />
+        <select value={draft.type} onChange={event => setDraft({ ...draft, type: event.target.value })}>
+          {SHAPES.map(shape => <option key={shape}>{shape}</option>)}
+        </select>
+        <input type="color" value={draft.color} onChange={event => setDraft({ ...draft, color: event.target.value })} />
+        <button className="button primary small" onClick={submitNode}>{selectedNode ? "Save shape" : "Add shape"}</button>
+        <button className="button secondary small" onClick={clearNodeForm}>Clear</button>
+        <button className="button secondary small" disabled={connectionNodes.length !== 2 || !diagram} onClick={connectSelectedNodes}>Connect</button>
+        <button className="button danger small" disabled={!selectedNode} onClick={removeNode}>Delete shape</button>
+        <button className="button danger small" disabled={!selectedEdges.size} onClick={deleteSelectedEdges}>Delete arrow</button>
+      </div>
+      <div
+        className="diagram-canvas"
+        onClick={clearNodeForm}
+        onPointerMove={event => {
+          if (!drag) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          setDrag({ ...drag, x: event.clientX - rect.left - drag.offsetX, y: event.clientY - rect.top - drag.offsetY });
+        }}
+        onPointerUp={endDrag}
+      >
+        <svg className="edge-layer">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+            </marker>
+          </defs>
+          {edges.map(edge => {
+            const source = renderedNodes.find(node => node.id === edge.sourceNodeId);
+            const target = renderedNodes.find(node => node.id === edge.targetNodeId);
+            if (!source || !target) return null;
+            const selected = selectedEdges.has(edge.id);
+            return (
+              <line
+                key={edge.id}
+                x1={source.x + source.width / 2}
+                y1={source.y + source.height / 2}
+                x2={target.x + target.width / 2}
+                y2={target.y + target.height / 2}
+                className={selected ? "edge selected" : "edge"}
+                markerEnd="url(#arrow)"
+                onClick={event => {
+                  event.stopPropagation();
+                  setSelectedEdges(new Set([edge.id]));
+                  setSelectedNode(null);
+                  setConnectionNodes([]);
+                  setDraft({ label: "", type: "task", color: "#2563eb" });
+                }}
+              />
+            );
+          })}
+        </svg>
+        {renderedNodes.map(node => {
+          const style = parseJson(node.styleJson);
+          return (
+            <button
+              key={node.id}
+              className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
+              style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb" }}
+              onClick={event => {
+                event.stopPropagation();
+                selectNode(node.id);
+              }}
+              onPointerDown={event => {
+                event.stopPropagation();
+                setDrag({ id: node.id, x: node.x, y: node.y, offsetX: event.nativeEvent.offsetX, offsetY: event.nativeEvent.offsetY });
+              }}
+            >
+              {node.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AppShell({ user, navigate, children }) {
+  const claims = decodeToken();
+  const name = user?.username || claims.preferred_username || "User";
+  return (
+    <>
+      <header className="topbar">
+        <button className="brand" onClick={() => navigate("/dashboard.html")}>Orderly</button>
+        <nav>
+          <span>{name}</span>
+          <button className="button secondary small" onClick={() => navigate("/dashboard.html")}>Dashboard</button>
+          <button className="button danger small" onClick={() => { clearToken(); navigate("/login.html"); }}>Log out</button>
+        </nav>
+      </header>
+      <main className="app-page">{children}</main>
+    </>
+  );
+}
+
+function Field({ label, value, onChange, type = "text", error, ...inputProps }) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        className={error ? "input-error" : ""}
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        required
+        {...inputProps}
+      />
+      {error && <small className="field-error">{error}</small>}
+    </label>
+  );
+}
+
+function Alert({ children }) {
+  return <div className="alert">{children}</div>;
+}
+
+function requireAuth(navigate) {
+  if (!isAuthenticated()) navigate("/login.html");
 }
 
 function getRoute() {
   const path = window.location.pathname.toLowerCase();
   const params = new URLSearchParams(window.location.search);
-
-  if (path.endsWith("/login.html")) {
-    return { page: "login", title: "Orderly | Sign In" };
-  }
-
-  if (path.endsWith("/dashboard.html")) {
-    return { page: "dashboard", title: "Orderly | Your Spaces" };
-  }
-
-  if (path.endsWith("/project.html")) {
-    return {
-      page: "project",
-      title: "Orderly | Space",
-      projectId: params.get("id") || "1"
-    };
-  }
-
-  return { page: "home", title: "Orderly | Home" };
+  if (path.endsWith("/login.html")) return { page: "login" };
+  if (path.endsWith("/dashboard.html")) return { page: "dashboard" };
+  if (path.endsWith("/project.html")) return { page: "space", spaceId: params.get("id") };
+  return { page: "register" };
 }
 
-function statusTone(status) {
-  const normalized = String(status).toLowerCase();
-  if (normalized.includes("done")) return "green";
-  if (normalized.includes("progress")) return "blue";
-  return "gray";
+function titleFor(type) {
+  if (type === "table") return "New Table";
+  if (type === "diagram") return "New Diagram";
+  return "New Checklist";
 }
 
-function priorityTone(priority) {
-  const normalized = String(priority).toLowerCase();
-  if (normalized === "high") return "red";
-  if (normalized === "medium") return "amber";
-  return "cyan";
+function validateRegistration(form) {
+  const errors = {};
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const usernamePattern = /^[a-zA-Z0-9._-]+$/;
+
+  if (!form.email) {
+    errors.email = "Email is required.";
+  } else if (!emailPattern.test(form.email)) {
+    errors.email = "Enter a valid email address.";
+  } else if (form.email.length > 255) {
+    errors.email = "Email must be 255 characters or fewer.";
+  }
+
+  if (!form.username) {
+    errors.username = "Username is required.";
+  } else if (form.username.length < 3) {
+    errors.username = "Username must be at least 3 characters.";
+  } else if (form.username.length > 100) {
+    errors.username = "Username must be 100 characters or fewer.";
+  } else if (!usernamePattern.test(form.username)) {
+    errors.username = "Use letters, numbers, dots, underscores, or hyphens.";
+  }
+
+  if (!form.password) {
+    errors.password = "Password is required.";
+  } else if (form.password.length < 8) {
+    errors.password = "Password must be at least 8 characters.";
+  } else if (form.password.length > 100) {
+    errors.password = "Password must be 100 characters or fewer.";
+  }
+
+  if (!form.confirmPassword) {
+    errors.confirmPassword = "Confirm your password.";
+  } else if (form.password !== form.confirmPassword) {
+    errors.confirmPassword = "Passwords do not match.";
+  }
+
+  return errors;
+}
+
+function parseJson(value) {
+  try {
+    return JSON.parse(value || "{}");
+  } catch {
+    return {};
+  }
 }
 
 export default App;

@@ -27,7 +27,20 @@ class EmailVerifiedFilterTest {
   }
 
   @Test
-  void rejectsApiRequestsWhenJwtEmailIsNotVerified() throws Exception {
+  void allowsApiRequestsWhenEmailVerificationIsDisabledByDefault() throws Exception {
+    SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt(false, "demo@orderly.local")));
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/spaces");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain = org.mockito.Mockito.mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    verify(chain).doFilter(request, response);
+  }
+
+  @Test
+  void rejectsApiRequestsWhenEmailVerificationIsEnabledAndJwtEmailIsNotVerified() throws Exception {
+    properties.setRequireVerifiedEmail(true);
     SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt(false, "demo@orderly.local")));
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/spaces");
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -41,7 +54,8 @@ class EmailVerifiedFilterTest {
   }
 
   @Test
-  void rejectsApiRequestsWhenJwtEmailIsMissing() throws Exception {
+  void rejectsApiRequestsWhenEmailVerificationIsEnabledAndJwtEmailIsMissing() throws Exception {
+    properties.setRequireVerifiedEmail(true);
     SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt(true, null)));
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/spaces");
     MockHttpServletResponse response = new MockHttpServletResponse();

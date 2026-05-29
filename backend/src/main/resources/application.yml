@@ -47,4 +47,4 @@ server:
 
 orderly:
   security:
-    require-verified-email: ${REQUIRE_VERIFIED_EMAIL:true}
+    require-verified-email: ${REQUIRE_VERIFIED_EMAIL:false}
