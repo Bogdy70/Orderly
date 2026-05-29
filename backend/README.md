@@ -14,7 +14,86 @@ Spring Boot API for Orderly spaces, blocks, checklist items, table rows and diag
 
 ## Database
 
-Create a PostgreSQL database and user:
+The easiest local setup is Docker Compose from the repository root:
+
+```bash
+docker compose up -d postgres
+```
+
+If your Docker install exposes Compose as the standalone command, use:
+
+```bash
+docker-compose up -d postgres
+```
+
+This starts PostgreSQL with the same defaults used by `application.yml`:
+
+```text
+host: localhost
+port: 5433
+database: orderly
+username: orderly
+password: orderly
+```
+
+The container's internal PostgreSQL port is still `5432`, but it is published on host port `5433` by default to avoid conflicts with a locally installed PostgreSQL service:
+
+```text
+DATABASE_URL=jdbc:postgresql://localhost:5433/orderly
+```
+
+To also start pgAdmin:
+
+```bash
+docker compose --profile tools up -d
+```
+
+or:
+
+```bash
+docker-compose --profile tools up -d
+```
+
+Then open:
+
+```text
+http://localhost:5050
+```
+
+Default pgAdmin login:
+
+```text
+email: admin@orderly.local
+password: admin
+```
+
+Inside pgAdmin, register a server with host `postgres`, database `orderly`, username `orderly`, and password `orderly`.
+
+Stop the containers:
+
+```bash
+docker compose down
+```
+
+or:
+
+```bash
+docker-compose down
+```
+
+Remove the database volume and start fresh:
+
+```bash
+docker compose down -v
+```
+
+or:
+
+```bash
+docker-compose down -v
+```
+
+If you prefer a manually installed PostgreSQL server, create a PostgreSQL database and user:
 
 ```sql
 CREATE DATABASE orderly;
@@ -25,7 +104,7 @@ GRANT ALL PRIVILEGES ON DATABASE orderly TO orderly;
 Configure with environment variables if you do not want the defaults:
 
 ```bash
-DATABASE_URL=jdbc:postgresql://localhost:5432/orderly
+DATABASE_URL=jdbc:postgresql://localhost:5433/orderly
 DATABASE_USERNAME=orderly
 DATABASE_PASSWORD=orderly
 PORT=8080
