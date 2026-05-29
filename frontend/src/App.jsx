@@ -32,8 +32,8 @@ import {
 const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb" };
 const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
 const BLOCK_TYPES = ["checklist", "table", "diagram"];
-const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
-const EDGE_TYPES = ["arrow", "dashed", "dotted", "double", "plain"];
+const SHAPES = ["task", "note", "milestone", "process", "document", "database", "input", "output", "terminator", "card", "capsule", "stamp", "flag", "wave", "portal", "burst"];
+const EDGE_TYPES = ["arrow", "curved", "elbow", "dashed", "dotted", "dash-dot", "bold", "soft", "double", "plain"];
 
 function App() {
   const [route, setRoute] = useState(getRoute());
@@ -716,12 +716,7 @@ function DiagramBlock({ block, content, refresh }) {
             if (!source || !target) return null;
             const selected = selectedEdges.has(edge.id);
             const type = edge.type || "arrow";
-            const x1 = source.x + source.width / 2;
-            const y1 = source.y + source.height / 2;
-            const x2 = target.x + target.width / 2;
-            const y2 = target.y + target.height / 2;
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2;
+            const geometry = edgeGeometry(source, target, type);
             const label = edge.label?.trim();
             return (
               <g
@@ -736,17 +731,14 @@ function DiagramBlock({ block, content, refresh }) {
                   setEdgeDraft({ label: edge.label || "", type });
                 }}
               >
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
+                <path
+                  d={geometry.path}
                   className={`edge edge-${type} ${selected ? "selected" : ""}`}
                   markerStart={type === "double" ? "url(#arrow-start)" : undefined}
                   markerEnd={type === "plain" ? undefined : "url(#arrow)"}
                 />
                 {label && (
-                  <text className={`edge-label ${selected ? "selected" : ""}`} x={midX} y={midY - 8}>
+                  <text className={`edge-label ${selected ? "selected" : ""}`} x={geometry.label.x} y={geometry.label.y - 8}>
                     {label}
                   </text>
                 )}
@@ -760,7 +752,7 @@ function DiagramBlock({ block, content, refresh }) {
             <button
               key={node.id}
               className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
-              style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb" }}
+              style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb", "--node-color": style.color || "#2563eb" }}
               onClick={event => {
                 event.stopPropagation();
                 selectNode(node.id);
@@ -881,6 +873,72 @@ function isTextInput(target) {
   if (!target) return false;
   const tag = target.tagName?.toLowerCase();
   return tag === "input" || tag === "select" || tag === "textarea" || target.isContentEditable;
+}
+
+function edgeGeometry(source, target, type) {
+  const sourceCenter = centerOf(source);
+  const targetCenter = centerOf(target);
+  const start = pointOnRectEdge(source, targetCenter);
+  const end = pointOnRectEdge(target, sourceCenter);
+
+  if (type === "curved") {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const curve = Math.min(Math.max(distance * 0.18, 34), 92);
+    const control = {
+      x: (start.x + end.x) / 2 - (dy / distance) * curve,
+      y: (start.y + end.y) / 2 + (dx / distance) * curve
+    };
+    return {
+      path: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
+      label: pointOnQuadratic(start, control, end, 0.5)
+    };
+  }
+
+  if (type === "elbow") {
+    const midX = (start.x + end.x) / 2;
+    return {
+      path: `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`,
+      label: { x: midX, y: (start.y + end.y) / 2 }
+    };
+  }
+
+  return {
+    path: `M ${start.x} ${start.y} L ${end.x} ${end.y}`,
+    label: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+  };
+}
+
+function centerOf(node) {
+  return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
+}
+
+function pointOnRectEdge(node, toward) {
+  const center = centerOf(node);
+  const dx = toward.x - center.x;
+  const dy = toward.y - center.y;
+  if (dx === 0 && dy === 0) return center;
+
+  const halfWidth = Math.max(node.width / 2, 1);
+  const halfHeight = Math.max(node.height / 2, 1);
+  const scale = Math.min(
+      Math.abs(dx) < 0.001 ? Number.POSITIVE_INFINITY : halfWidth / Math.abs(dx),
+      Math.abs(dy) < 0.001 ? Number.POSITIVE_INFINITY : halfHeight / Math.abs(dy)
+  );
+
+  return {
+    x: center.x + dx * scale,
+    y: center.y + dy * scale
+  };
+}
+
+function pointOnQuadratic(start, control, end, t) {
+  const inverse = 1 - t;
+  return {
+    x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+    y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
+  };
 }
 
 function parseJson(value) {

@@ -661,6 +661,28 @@ input.input-error {
   stroke-linecap: round;
 }
 
+.edge-dash-dot {
+  stroke-dasharray: 14 6 3 6;
+}
+
+.edge-bold {
+  stroke-width: 5;
+}
+
+.edge-soft {
+  stroke: #0f766e;
+  stroke-width: 6;
+  opacity: 0.58;
+}
+
+.edge-curved {
+  stroke: #7c2d5a;
+}
+
+.edge-elbow {
+  stroke-linejoin: round;
+}
+
 .edge-double {
   stroke-width: 3;
 }
@@ -703,19 +725,51 @@ input.input-error {
 
 .diagram-node.task,
 .diagram-node.process { border-radius: 8px; }
-.diagram-node.note { border-radius: 18px; }
-.diagram-node.decision {
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  padding-inline: 24px;
+.diagram-node.note {
+  border-radius: 18px;
+  transform: rotate(-1deg);
 }
+.diagram-node.card {
+  border-radius: 18px 5px 18px 5px;
+}
+.diagram-node.capsule,
 .diagram-node.milestone,
 .diagram-node.terminator { border-radius: 999px; }
+.diagram-node.stamp {
+  border-style: dashed;
+  border-radius: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.diagram-node.flag {
+  border-left-width: 12px;
+  border-radius: 5px 18px 18px 5px;
+}
+.diagram-node.wave {
+  border-radius: 28px 8px 28px 8px;
+}
+.diagram-node.portal {
+  border-style: double;
+  border-width: 6px;
+  border-radius: 50% / 28%;
+}
+.diagram-node.burst {
+  border-style: dashed;
+  border-radius: 50% 18% 48% 22%;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--node-color, var(--brand)) 16%, transparent), 0 12px 24px rgba(94, 49, 17, 0.16);
+}
 .diagram-node.document { border-radius: 8px 18px 8px 8px; }
 .diagram-node.database { border-radius: 50% / 14%; }
 .diagram-node.input,
 .diagram-node.output {
-  clip-path: polygon(12% 0, 100% 0, 88% 100%, 0 100%);
-  padding-inline: 20px;
+  border-radius: 8px;
+  transform: skewX(-8deg);
+}
+.diagram-node.input {
+  border-left-width: 9px;
+}
+.diagram-node.output {
+  border-right-width: 9px;
 }
 .diagram-node.selected { outline: 3px solid rgba(180, 83, 9, 0.22); }
 .diagram-node.connect-start { box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.2), 0 12px 24px rgba(94, 49, 17, 0.16); }
