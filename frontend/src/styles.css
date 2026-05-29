@@ -617,6 +617,8 @@ input.input-error {
 .diagram-tools input:not([type="color"]) { flex: 1 1 180px; }
 .diagram-tools select { width: 130px; }
 .diagram-tools input[type="color"] { width: 54px; }
+.diagram-tools .edge-label-input { flex: 1 1 160px; }
+.diagram-tools .edge-type-select { width: 112px; }
 
 .diagram-canvas {
   position: relative;
@@ -639,15 +641,52 @@ input.input-error {
   height: 100%;
 }
 
+.edge-group {
+  cursor: pointer;
+}
+
 .edge {
   stroke: #5d4b40;
   stroke-width: 2.5;
+  fill: none;
   pointer-events: stroke;
+}
+
+.edge-dashed {
+  stroke-dasharray: 12 8;
+}
+
+.edge-dotted {
+  stroke-dasharray: 2 8;
+  stroke-linecap: round;
+}
+
+.edge-double {
+  stroke-width: 3;
+}
+
+.edge-plain {
+  stroke: #0f766e;
 }
 
 .edge.selected {
   stroke: var(--danger);
   stroke-width: 4;
+}
+
+.edge-label {
+  fill: #2a211c;
+  stroke: rgba(255, 252, 247, 0.92);
+  stroke-width: 5px;
+  paint-order: stroke fill;
+  font-size: 0.78rem;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.edge-label.selected {
+  fill: var(--danger);
 }
 
 .diagram-node {

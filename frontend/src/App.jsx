@@ -24,6 +24,7 @@ import {
   registerAccount,
   updateBlock,
   updateChecklistItem,
+  updateDiagramEdge,
   updateDiagramNode,
   updateTableRow
 } from "./services/api.js";
@@ -32,6 +33,7 @@ const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb
 const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
 const BLOCK_TYPES = ["checklist", "table", "diagram"];
 const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
+const EDGE_TYPES = ["arrow", "dashed", "dotted", "double", "plain"];
 
 function App() {
   const [route, setRoute] = useState(getRoute());
@@ -542,20 +544,28 @@ function DiagramBlock({ block, content, refresh }) {
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [drag, setDrag] = useState(null);
   const [draft, setDraft] = useState({ label: "", type: "task", color: "#2563eb" });
+  const [edgeDraft, setEdgeDraft] = useState({ label: "", type: "arrow" });
   const diagram = content?.diagram;
   const nodes = content?.nodes || [];
   const edges = content?.edges || [];
+  const selectedEdgeId = [...selectedEdges][0] || null;
+  const selectedEdge = edges.find(edge => edge.id === selectedEdgeId);
 
   useEffect(() => {
     function onKeyDown(event) {
+      if (isTextInput(event.target)) return;
       if (event.key === "Backspace" && selectedEdges.size) {
         event.preventDefault();
         deleteSelectedEdges();
       }
+      if (event.key === "Enter" && connectionNodes.length === 2 && diagram) {
+        event.preventDefault();
+        connectSelectedNodes();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedEdges, edges]);
+  }, [selectedEdges, connectionNodes, diagram, edgeDraft, edges]);
 
   useEffect(() => {
     if (!selectedNode) return;
@@ -579,6 +589,7 @@ function DiagramBlock({ block, content, refresh }) {
     setSelectedEdges(new Set());
     setConnectionNodes([]);
     setDraft({ label: "", type: "task", color: "#2563eb" });
+    setEdgeDraft({ label: "", type: "arrow" });
   }
 
   async function ensureDiagram() {
@@ -617,8 +628,24 @@ function DiagramBlock({ block, content, refresh }) {
 
   async function connectSelectedNodes() {
     if (!diagram || connectionNodes.length !== 2 || connectionNodes[0] === connectionNodes[1]) return;
-    await createDiagramEdge(diagram.id, { sourceNodeId: connectionNodes[0], targetNodeId: connectionNodes[1], type: "arrow", label: "", styleJson: "{}" });
+    await createDiagramEdge(diagram.id, {
+      sourceNodeId: connectionNodes[0],
+      targetNodeId: connectionNodes[1],
+      type: edgeDraft.type,
+      label: edgeDraft.label.trim(),
+      styleJson: "{}"
+    });
     setConnectionNodes([]);
+    setEdgeDraft({ label: "", type: "arrow" });
+    refresh();
+  }
+
+  async function saveSelectedEdge() {
+    if (!selectedEdgeId) return;
+    await updateDiagramEdge(selectedEdgeId, {
+      label: edgeDraft.label.trim(),
+      type: edgeDraft.type
+    });
     refresh();
   }
 
@@ -658,6 +685,11 @@ function DiagramBlock({ block, content, refresh }) {
         <button className="button secondary small" disabled={connectionNodes.length !== 2 || !diagram} onClick={connectSelectedNodes}>Connect</button>
         <button className="button danger small" disabled={!selectedNode} onClick={removeNode}>Delete shape</button>
         <button className="button danger small" disabled={!selectedEdges.size} onClick={deleteSelectedEdges}>Delete arrow</button>
+        <input className="edge-label-input" placeholder={selectedEdge ? "Arrow label" : "New arrow label"} value={edgeDraft.label} onChange={event => setEdgeDraft({ ...edgeDraft, label: event.target.value })} />
+        <select className="edge-type-select" value={edgeDraft.type} onChange={event => setEdgeDraft({ ...edgeDraft, type: event.target.value })}>
+          {EDGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+        </select>
+        <button className="button secondary small" disabled={!selectedEdge} onClick={saveSelectedEdge}>Save arrow</button>
       </div>
       <div
         className="diagram-canvas"
@@ -672,7 +704,10 @@ function DiagramBlock({ block, content, refresh }) {
         <svg className="edge-layer">
           <defs>
             <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+              <path d="M0,0 L0,6 L9,3 z" fill="#5d4b40" />
+            </marker>
+            <marker id="arrow-start" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto">
+              <path d="M9,0 L9,6 L0,3 z" fill="#5d4b40" />
             </marker>
           </defs>
           {edges.map(edge => {
@@ -680,23 +715,42 @@ function DiagramBlock({ block, content, refresh }) {
             const target = renderedNodes.find(node => node.id === edge.targetNodeId);
             if (!source || !target) return null;
             const selected = selectedEdges.has(edge.id);
+            const type = edge.type || "arrow";
+            const x1 = source.x + source.width / 2;
+            const y1 = source.y + source.height / 2;
+            const x2 = target.x + target.width / 2;
+            const y2 = target.y + target.height / 2;
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const label = edge.label?.trim();
             return (
-              <line
+              <g
                 key={edge.id}
-                x1={source.x + source.width / 2}
-                y1={source.y + source.height / 2}
-                x2={target.x + target.width / 2}
-                y2={target.y + target.height / 2}
-                className={selected ? "edge selected" : "edge"}
-                markerEnd="url(#arrow)"
+                className="edge-group"
                 onClick={event => {
                   event.stopPropagation();
                   setSelectedEdges(new Set([edge.id]));
                   setSelectedNode(null);
                   setConnectionNodes([]);
                   setDraft({ label: "", type: "task", color: "#2563eb" });
+                  setEdgeDraft({ label: edge.label || "", type });
                 }}
-              />
+              >
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  className={`edge edge-${type} ${selected ? "selected" : ""}`}
+                  markerStart={type === "double" ? "url(#arrow-start)" : undefined}
+                  markerEnd={type === "plain" ? undefined : "url(#arrow)"}
+                />
+                {label && (
+                  <text className={`edge-label ${selected ? "selected" : ""}`} x={midX} y={midY - 8}>
+                    {label}
+                  </text>
+                )}
+              </g>
             );
           })}
         </svg>
@@ -821,6 +875,12 @@ function validateRegistration(form) {
   }
 
   return errors;
+}
+
+function isTextInput(target) {
+  if (!target) return false;
+  const tag = target.tagName?.toLowerCase();
+  return tag === "input" || tag === "select" || tag === "textarea" || target.isContentEditable;
 }
 
 function parseJson(value) {

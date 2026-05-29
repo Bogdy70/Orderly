@@ -161,6 +161,10 @@ export async function createDiagramEdge(diagramId, payload) {
   return apiFetch(`/api/diagrams/${diagramId}/edges`, { method: "POST", body: payload });
 }
 
+export async function updateDiagramEdge(edgeId, payload) {
+  return apiFetch(`/api/diagram-edges/${edgeId}`, { method: "PATCH", body: payload });
+}
+
 export async function deleteDiagramEdge(edgeId) {
   return apiFetch(`/api/diagram-edges/${edgeId}`, { method: "DELETE" });
 }
