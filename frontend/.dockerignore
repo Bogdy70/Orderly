@@ -1,0 +1,8 @@
+node_modules
+dist
+.venv
+data
+*.log
+npm-debug.log*
+.idea
+.vscode
