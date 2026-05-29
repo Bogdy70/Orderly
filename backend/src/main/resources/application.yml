@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: orderly-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/orderly}
+    username: ${DATABASE_USERNAME:orderly}
+    password: ${DATABASE_PASSWORD:orderly}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:8080}
