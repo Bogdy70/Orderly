@@ -63,6 +63,8 @@ public class KeycloakRegistrationService {
           .body(Map.of(
               "username", username,
               "email", email,
+              "firstName", username,
+              "lastName", "Orderly",
               "enabled", true,
               "emailVerified", true,
               "requiredActions", List.of()
@@ -72,6 +74,7 @@ public class KeycloakRegistrationService {
 
       String keycloakId = extractCreatedUserId(response.getHeaders().getLocation());
       setPassword(adminToken, keycloakId, request.password());
+      finalizeUserSetup(adminToken, keycloakId, username, email);
 
       UserEntity user = new UserEntity();
       user.setKeycloakId(keycloakId);
@@ -122,6 +125,24 @@ public class KeycloakRegistrationService {
             "type", "password",
             "value", password,
             "temporary", false
+        ))
+        .retrieve()
+        .toBodilessEntity();
+  }
+
+  private void finalizeUserSetup(String adminToken, String keycloakId, String username, String email) {
+    restClient.put()
+        .uri(URI.create(serverUrl + "/admin/realms/" + realm + "/users/" + keycloakId))
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Map.of(
+            "username", username,
+            "email", email,
+            "firstName", username,
+            "lastName", "Orderly",
+            "enabled", true,
+            "emailVerified", true,
+            "requiredActions", List.of()
         ))
         .retrieve()
         .toBodilessEntity();

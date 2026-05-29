@@ -46,7 +46,9 @@ export async function login(username, password) {
   });
 
   if (!response.ok) {
-    throw new Error("Login failed.");
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json") ? await response.json() : {};
+    throw new Error(data.error_description || data.error || "Login failed.");
   }
 
   const data = await response.json();

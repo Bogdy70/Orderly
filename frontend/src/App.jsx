@@ -15,7 +15,6 @@ import {
   deleteDiagramNode,
   deleteSpace,
   deleteTableRow,
-  ensureLocalUser,
   getCurrentUser,
   getSpaceFull,
   isAuthenticated,
@@ -107,10 +106,10 @@ function LoginPage({ navigate }) {
   async function submit(event) {
     event.preventDefault();
     setBusy(true);
-    setMessage("");
+      setMessage("");
     try {
       await login(form.username, form.password);
-      await ensureLocalUser();
+      await getCurrentUser();
       navigate("/dashboard.html");
     } catch (error) {
       setMessage(error.message);
@@ -408,7 +407,7 @@ function ChecklistBlock({ block, items, refresh }) {
 }
 
 function TableBlock({ block, rows, refresh }) {
-  const [form, setForm] = useState({ title: "", status: "todo", priority: "", dueDate: "" });
+  const [form, setForm] = useState({ title: "", status: "todo", priority: "low", dueDate: "" });
   const [editingRow, setEditingRow] = useState(null);
 
   function editRow(row) {
@@ -416,20 +415,20 @@ function TableBlock({ block, rows, refresh }) {
     setForm({
       title: row.title || "",
       status: row.status || "todo",
-      priority: row.priority || "",
+      priority: row.priority || "low",
       dueDate: row.dueDate || ""
     });
   }
 
   function clearEdit() {
     setEditingRow(null);
-    setForm({ title: "", status: "todo", priority: "", dueDate: "" });
+    setForm({ title: "", status: "todo", priority: "low", dueDate: "" });
   }
 
   async function submit(event) {
     event.preventDefault();
     if (!form.title.trim()) return;
-    const payload = { ...form, title: form.title.trim(), priority: form.priority || null, dueDate: form.dueDate || null };
+    const payload = { ...form, title: form.title.trim(), priority: form.priority || "low", dueDate: form.dueDate || null };
     if (editingRow) {
       await updateTableRow(editingRow.id, payload);
     } else {
@@ -447,8 +446,7 @@ function TableBlock({ block, rows, refresh }) {
           <option value="pending">pending</option>
           <option value="done">done</option>
         </select>
-        <select value={form.priority || ""} onChange={event => setForm({ ...form, priority: event.target.value })}>
-          <option value="">priority</option>
+        <select value={form.priority || "low"} onChange={event => setForm({ ...form, priority: event.target.value })}>
           <option value="low">low</option>
           <option value="medium">medium</option>
           <option value="high">high</option>

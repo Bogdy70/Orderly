@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "orderly.security")
 public class OrderlySecurityProperties {
-  private boolean requireVerifiedEmail = true;
+  private boolean requireVerifiedEmail = false;
 
   public boolean isRequireVerifiedEmail() {
     return requireVerifiedEmail;

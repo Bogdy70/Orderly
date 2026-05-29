@@ -57,6 +57,10 @@ class KeycloakRegistrationServiceTest {
         .andExpect(method(HttpMethod.PUT))
         .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer admin-token"))
         .andRespond(withStatus(HttpStatus.NO_CONTENT));
+    server.expect(once(), requestTo("http://keycloak/admin/realms/orderly/users/keycloak-123"))
+        .andExpect(method(HttpMethod.PUT))
+        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer admin-token"))
+        .andRespond(withStatus(HttpStatus.NO_CONTENT));
 
     service.register(new RegisterRequest("New.User@Example.com", "new-user", "password"));
 
