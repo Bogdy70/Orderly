@@ -29,6 +29,11 @@ public class UserController {
     return userService.create(request);
   }
 
+  @GetMapping("/me")
+  public UserDtos.UserResponse me() {
+    return userService.currentUser();
+  }
+
   @GetMapping("/{id}")
   public UserDtos.UserResponse get(@PathVariable Long id) {
     return userService.get(id);

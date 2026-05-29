@@ -10,17 +10,13 @@ public final class UserDtos {
 
   public record CreateUserRequest(
       @Email @NotBlank String email,
-      @NotBlank String username,
-      String passwordHash,
-      String authProviderId
+      @NotBlank String username
   ) {
   }
 
   public record UpdateUserRequest(
       String email,
-      String username,
-      String passwordHash,
-      String authProviderId
+      String username
   ) {
   }
 
@@ -28,7 +24,7 @@ public final class UserDtos {
       Long id,
       String email,
       String username,
-      String authProviderId,
+      String keycloakId,
       Instant createdAt,
       Instant updatedAt
   ) {

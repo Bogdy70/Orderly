@@ -2,6 +2,7 @@ package com.orderly.backend.controller;
 
 import com.orderly.backend.dto.SpaceDtos;
 import com.orderly.backend.service.SpaceService;
+import com.orderly.backend.service.UserService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,20 +20,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/spaces")
 public class SpaceController {
   private final SpaceService spaceService;
+  private final UserService userService;
 
-  public SpaceController(SpaceService spaceService) {
+  public SpaceController(SpaceService spaceService, UserService userService) {
     this.spaceService = spaceService;
+    this.userService = userService;
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public SpaceDtos.SpaceResponse create(@Valid @RequestBody SpaceDtos.CreateSpaceRequest request) {
-    return spaceService.create(request);
+    return spaceService.create(request, userService.getCurrentUserEntity());
   }
 
   @GetMapping
-  public List<SpaceDtos.SpaceResponse> list(@RequestParam(required = false) Long ownerId) {
-    return spaceService.list(ownerId);
+  public List<SpaceDtos.SpaceResponse> list() {
+    return spaceService.list(userService.getCurrentUserEntity());
   }
 
   @GetMapping("/{id}")

@@ -2,6 +2,7 @@ package com.orderly.backend.service;
 
 import com.orderly.backend.dto.SpaceDtos;
 import com.orderly.backend.entity.SpaceEntity;
+import com.orderly.backend.entity.UserEntity;
 import com.orderly.backend.repository.SpaceRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -11,18 +12,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class SpaceService {
   private final SpaceRepository spaceRepository;
-  private final UserService userService;
   private final BlockFullService blockFullService;
 
-  public SpaceService(SpaceRepository spaceRepository, UserService userService, BlockFullService blockFullService) {
+  public SpaceService(SpaceRepository spaceRepository, BlockFullService blockFullService) {
     this.spaceRepository = spaceRepository;
-    this.userService = userService;
     this.blockFullService = blockFullService;
   }
 
-  public SpaceDtos.SpaceResponse create(SpaceDtos.CreateSpaceRequest request) {
+  public SpaceDtos.SpaceResponse create(SpaceDtos.CreateSpaceRequest request, UserEntity owner) {
     SpaceEntity space = new SpaceEntity();
-    space.setOwner(userService.getEntity(request.ownerId()));
+    space.setOwner(owner);
     space.setName(request.name());
     space.setDescription(request.description());
     space.setIcon(request.icon());
@@ -31,11 +30,11 @@ public class SpaceService {
   }
 
   @Transactional(readOnly = true)
-  public List<SpaceDtos.SpaceResponse> list(Long ownerId) {
-    List<SpaceEntity> spaces = ownerId == null
-        ? spaceRepository.findAll()
-        : spaceRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId);
-    return spaces.stream().map(DtoMapper::toSpace).toList();
+  public List<SpaceDtos.SpaceResponse> list(UserEntity owner) {
+    return spaceRepository.findByOwnerIdOrderByCreatedAtDesc(owner.getId())
+        .stream()
+        .map(DtoMapper::toSpace)
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -54,7 +53,6 @@ public class SpaceService {
 
   public SpaceDtos.SpaceResponse update(Long id, SpaceDtos.UpdateSpaceRequest request) {
     SpaceEntity space = getEntity(id);
-    if (request.ownerId() != null) space.setOwner(userService.getEntity(request.ownerId()));
     if (request.name() != null) space.setName(request.name());
     if (request.description() != null) space.setDescription(request.description());
     if (request.icon() != null) space.setIcon(request.icon());
