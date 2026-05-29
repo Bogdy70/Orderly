@@ -447,7 +447,12 @@ function TableBlock({ block, rows, refresh }) {
           <option value="pending">pending</option>
           <option value="done">done</option>
         </select>
-        <input placeholder="Priority" value={form.priority || ""} onChange={event => setForm({ ...form, priority: event.target.value })} />
+        <select value={form.priority || ""} onChange={event => setForm({ ...form, priority: event.target.value })}>
+          <option value="">priority</option>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
         <input type="date" value={form.dueDate || ""} onChange={event => setForm({ ...form, dueDate: event.target.value })} />
         <button className="button primary small">{editingRow ? "Save" : "Add"}</button>
         {editingRow && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
@@ -602,11 +607,16 @@ function DiagramBlock({ block, content, refresh }) {
         <button className="button danger small" disabled={!selectedNode} onClick={removeNode}>Delete shape</button>
         <button className="button danger small" disabled={!selectedEdges.size} onClick={deleteSelectedEdges}>Delete arrow</button>
       </div>
-      <div className="diagram-canvas" onPointerMove={event => {
-        if (!drag) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        setDrag({ ...drag, x: event.clientX - rect.left - drag.offsetX, y: event.clientY - rect.top - drag.offsetY });
-      }} onPointerUp={endDrag}>
+      <div
+        className="diagram-canvas"
+        onClick={clearNodeForm}
+        onPointerMove={event => {
+          if (!drag) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          setDrag({ ...drag, x: event.clientX - rect.left - drag.offsetX, y: event.clientY - rect.top - drag.offsetY });
+        }}
+        onPointerUp={endDrag}
+      >
         <svg className="edge-layer">
           <defs>
             <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
@@ -645,7 +655,10 @@ function DiagramBlock({ block, content, refresh }) {
               key={node.id}
               className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
               style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb" }}
-              onClick={() => selectNode(node.id)}
+              onClick={event => {
+                event.stopPropagation();
+                selectNode(node.id);
+              }}
               onPointerDown={event => {
                 event.stopPropagation();
                 setDrag({ id: node.id, x: node.x, y: node.y, offsetX: event.nativeEvent.offsetX, offsetY: event.nativeEvent.offsetY });

@@ -65,17 +65,14 @@ public class KeycloakRegistrationService {
               "email", email,
               "enabled", true,
               "emailVerified", true,
-              "requiredActions", List.of(),
-              "credentials", List.of(Map.of(
-                  "type", "password",
-                  "value", request.password(),
-                  "temporary", false
-              ))
+              "requiredActions", List.of()
           ))
           .retrieve()
           .toBodilessEntity();
 
       String keycloakId = extractCreatedUserId(response.getHeaders().getLocation());
+      setPassword(adminToken, keycloakId, request.password());
+
       UserEntity user = new UserEntity();
       user.setKeycloakId(keycloakId);
       user.setEmail(email);
@@ -114,6 +111,20 @@ public class KeycloakRegistrationService {
     }
 
     throw ApiException.badRequest("Keycloak admin token was missing.");
+  }
+
+  private void setPassword(String adminToken, String keycloakId, String password) {
+    restClient.put()
+        .uri(URI.create(serverUrl + "/admin/realms/" + realm + "/users/" + keycloakId + "/reset-password"))
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Map.of(
+            "type", "password",
+            "value", password,
+            "temporary", false
+        ))
+        .retrieve()
+        .toBodilessEntity();
   }
 
   private String extractCreatedUserId(URI location) {

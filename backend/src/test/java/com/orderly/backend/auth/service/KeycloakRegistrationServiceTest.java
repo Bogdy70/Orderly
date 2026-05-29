@@ -53,6 +53,10 @@ class KeycloakRegistrationServiceTest {
         .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer admin-token"))
         .andRespond(withStatus(HttpStatus.CREATED)
             .location(java.net.URI.create("http://keycloak/admin/realms/orderly/users/keycloak-123")));
+    server.expect(once(), requestTo("http://keycloak/admin/realms/orderly/users/keycloak-123/reset-password"))
+        .andExpect(method(HttpMethod.PUT))
+        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer admin-token"))
+        .andRespond(withStatus(HttpStatus.NO_CONTENT));
 
     service.register(new RegisterRequest("New.User@Example.com", "new-user", "password"));
 
