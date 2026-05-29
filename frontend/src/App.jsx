@@ -455,6 +455,8 @@ function ChecklistBlock({ block, items, refresh }) {
 function TableBlock({ block, rows, refresh }) {
   const [form, setForm] = useState({ title: "", status: "todo", priority: "low", dueDate: "" });
   const [editingRow, setEditingRow] = useState(null);
+  const [dateError, setDateError] = useState("");
+  const minDueDate = todayIso();
 
   function editRow(row) {
     setEditingRow(row);
@@ -469,11 +471,17 @@ function TableBlock({ block, rows, refresh }) {
   function clearEdit() {
     setEditingRow(null);
     setForm({ title: "", status: "todo", priority: "low", dueDate: "" });
+    setDateError("");
   }
 
   async function submit(event) {
     event.preventDefault();
     if (!form.title.trim()) return;
+    if (form.dueDate && form.dueDate < minDueDate) {
+      setDateError("Due date cannot be earlier than today.");
+      return;
+    }
+    setDateError("");
     const payload = { ...form, title: form.title.trim(), priority: form.priority || "low", dueDate: form.dueDate || null };
     if (editingRow) {
       await updateTableRow(editingRow.id, payload);
@@ -497,10 +505,14 @@ function TableBlock({ block, rows, refresh }) {
           <option value="medium">medium</option>
           <option value="high">high</option>
         </select>
-        <input type="date" value={form.dueDate || ""} onChange={event => setForm({ ...form, dueDate: event.target.value })} />
+        <input type="date" min={minDueDate} value={form.dueDate || ""} onChange={event => {
+          setDateError("");
+          setForm({ ...form, dueDate: event.target.value });
+        }} />
         <button className="button primary small">{editingRow ? "Save" : "Add"}</button>
         {editingRow && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
       </form>
+      {dateError && <p className="inline-error">{dateError}</p>}
       <div className="rows">
         {rows.length > 0 && (
           <div className="data-row table-head">
@@ -516,7 +528,7 @@ function TableBlock({ block, rows, refresh }) {
             <span className="row-title">{row.title}</span>
             <span><StatusBadge status={row.status} /></span>
             <span><PriorityBadge priority={row.priority || "low"} /></span>
-            <span>{row.dueDate || "no date"}</span>
+            <span><DateBadge dueDate={row.dueDate} /></span>
             <div className="row-actions">
               <button className="button secondary small" type="button" onClick={() => editRow(row)}>Edit</button>
               <button className="text-danger" type="button" onClick={() => deleteTableRow(row.id).then(refresh)}>Delete</button>
@@ -536,6 +548,13 @@ function StatusBadge({ status }) {
 function PriorityBadge({ priority }) {
   const value = priority || "low";
   return <span className={`badge priority-${value}`}>{value}</span>;
+}
+
+function DateBadge({ dueDate }) {
+  if (!dueDate) return <span className="no-date">no date</span>;
+  const today = todayIso();
+  const className = dueDate === today ? "date-today" : dueDate < today ? "date-past" : "date-upcoming";
+  return <span className={`badge date-badge ${className}`}>{formatDate(dueDate)}</span>;
 }
 
 function DiagramBlock({ block, content, refresh }) {
@@ -939,6 +958,18 @@ function pointOnQuadratic(start, control, end, t) {
     x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
     y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
   };
+}
+
+function todayIso() {
+  const date = new Date();
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 10);
+}
+
+function formatDate(value) {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}.${month}.${year}`;
 }
 
 function parseJson(value) {

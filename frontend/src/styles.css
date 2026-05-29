@@ -178,6 +178,13 @@ input.input-error {
   font-weight: 700;
 }
 
+.inline-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .button {
   display: inline-flex;
   min-height: 40px;
@@ -583,6 +590,34 @@ input.input-error {
   border-color: rgba(217, 119, 6, 0.2);
   background: rgba(254, 243, 199, 0.9);
   color: #92400e;
+}
+
+.date-badge {
+  min-width: 92px;
+}
+
+.date-upcoming {
+  border-color: rgba(15, 118, 110, 0.18);
+  background: rgba(204, 251, 241, 0.72);
+  color: #0f5f59;
+}
+
+.date-today {
+  border-color: rgba(217, 119, 6, 0.22);
+  background: rgba(254, 243, 199, 0.92);
+  color: #92400e;
+}
+
+.date-past {
+  border-color: rgba(180, 35, 60, 0.2);
+  background: rgba(255, 228, 230, 0.88);
+  color: var(--danger);
+}
+
+.no-date {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .row-title {

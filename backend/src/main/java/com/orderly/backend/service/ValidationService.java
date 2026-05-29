@@ -3,6 +3,7 @@ package com.orderly.backend.service;
 import com.orderly.backend.entity.BlockEntity;
 import com.orderly.backend.entity.BlockType;
 import com.orderly.backend.exception.ApiException;
+import java.time.LocalDate;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,12 @@ public class ValidationService {
       throw ApiException.badRequest("Table row status must be one of: todo, pending, done.");
     }
     return normalized;
+  }
+
+  public void requireTodayOrFutureDueDate(LocalDate dueDate) {
+    if (dueDate != null && dueDate.isBefore(LocalDate.now())) {
+      throw ApiException.badRequest("Due date cannot be earlier than today.");
+    }
   }
 
   public void requirePositiveDimensions(Double width, Double height) {

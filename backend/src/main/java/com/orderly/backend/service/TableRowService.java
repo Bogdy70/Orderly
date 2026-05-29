@@ -33,6 +33,7 @@ public class TableRowService {
   }
 
   TableRowEntity createEntity(BlockEntity block, String title, String status, String priority, LocalDate dueDate, Integer position) {
+    validationService.requireTodayOrFutureDueDate(dueDate);
     TableRowEntity row = new TableRowEntity();
     row.setBlock(block);
     row.setTitle(title);
@@ -58,7 +59,10 @@ public class TableRowService {
     if (request.title() != null) row.setTitle(request.title());
     if (request.status() != null) row.setStatus(validationService.normalizeStatus(request.status()));
     if (request.priority() != null) row.setPriority(request.priority());
-    if (request.dueDate() != null) row.setDueDate(request.dueDate());
+    if (request.dueDate() != null) {
+      validationService.requireTodayOrFutureDueDate(request.dueDate());
+      row.setDueDate(request.dueDate());
+    }
     if (request.position() != null) row.setPosition(request.position());
     return DtoMapper.toTableRow(row);
   }

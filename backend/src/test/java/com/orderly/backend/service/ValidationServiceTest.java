@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.orderly.backend.entity.BlockEntity;
 import com.orderly.backend.entity.BlockType;
 import com.orderly.backend.exception.ApiException;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 class ValidationServiceTest {
@@ -22,6 +23,20 @@ class ValidationServiceTest {
     assertThatThrownBy(() -> validationService.normalizeStatus("blocked"))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("todo, pending, done");
+  }
+
+  @Test
+  void rejectsPastDueDate() {
+    assertThatThrownBy(() -> validationService.requireTodayOrFutureDueDate(LocalDate.now().minusDays(1)))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Due date cannot be earlier than today");
+  }
+
+  @Test
+  void allowsTodayAndFutureDueDates() {
+    validationService.requireTodayOrFutureDueDate(LocalDate.now());
+    validationService.requireTodayOrFutureDueDate(LocalDate.now().plusDays(1));
+    validationService.requireTodayOrFutureDueDate(null);
   }
 
   @Test
