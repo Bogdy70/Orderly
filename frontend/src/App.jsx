@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   clearToken,
   createBlock,
@@ -31,11 +31,6 @@ import {
 const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb" };
 const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
 const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
-const BLOCK_SIZES = {
-  checklist: { width: 560, height: 360 },
-  table: { width: 820, height: 400 },
-  diagram: { width: 780, height: 620 }
-};
 
 function App() {
   const [route, setRoute] = useState(getRoute());
@@ -224,9 +219,8 @@ function SpacePage({ navigate, spaceId }) {
   const [space, setSpace] = useState(null);
   const [blocks, setBlocks] = useState([]);
   const [blockForm, setBlockForm] = useState(EMPTY_BLOCK);
-  const [layout, setLayout] = useState({});
-  const [drag, setDrag] = useState(null);
-  const boardRef = useRef(null);
+  const [draggedBlockId, setDraggedBlockId] = useState(null);
+  const [dropTargetId, setDropTargetId] = useState(null);
 
   useEffect(() => {
     requireAuth(navigate);
@@ -243,73 +237,49 @@ function SpacePage({ navigate, spaceId }) {
     event.preventDefault();
     const title = blockForm.title.trim() || titleFor(blockForm.type);
     const position = blocks.length + 1;
-    const defaults = defaultBlockLayout(blockForm.type, blocks.length);
-    const block = await createBlock(spaceId, { ...blockForm, title, position, ...defaults });
+    const block = await createBlock(spaceId, { ...blockForm, title, position });
     if (block.type === "diagram") await createDiagram(block.id);
     setBlockForm(EMPTY_BLOCK);
     refresh();
   }
 
-  function positionFor(item, index) {
-    const fallback = defaultBlockLayout(item.block.type, index);
-    return layout[item.block.id] || {
-      x: numberOr(item.block.x, fallback.x),
-      y: numberOr(item.block.y, fallback.y)
-    };
+  const orderedBlocks = [...blocks].sort((left, right) =>
+    (left.block.position ?? 0) - (right.block.position ?? 0) || left.block.id - right.block.id
+  );
+
+  function startReorder(event, blockId) {
+    setDraggedBlockId(blockId);
+    setDropTargetId(blockId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(blockId));
   }
 
-  function sizeFor(block) {
-    const fallback = BLOCK_SIZES[block.type] || BLOCK_SIZES.checklist;
-    return {
-      width: numberOr(block.width, fallback.width),
-      height: numberOr(block.height, fallback.height)
-    };
+  function allowDrop(event, blockId) {
+    event.preventDefault();
+    if (draggedBlockId && draggedBlockId !== blockId) {
+      setDropTargetId(blockId);
+    }
   }
 
-  const boardSize = useMemo(() => {
-    return blocks.reduce((size, item, index) => {
-      const pos = positionFor(item, index);
-      const blockSize = sizeFor(item.block);
-      return {
-        minWidth: Math.max(size.minWidth, pos.x + blockSize.width + 48),
-        minHeight: Math.max(size.minHeight, pos.y + blockSize.height + 48)
-      };
-    }, { minWidth: 1180, minHeight: 760 });
-  }, [blocks, layout]);
+  async function reorderBlocks(sourceId, targetId) {
+    setDraggedBlockId(null);
+    setDropTargetId(null);
+    if (!sourceId || !targetId || sourceId === targetId) return;
 
-  function startBlockDrag(event, item, index) {
-    if (event.button !== 0) return;
-    const point = positionFor(item, index);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setDrag({ id: item.block.id, offsetX: event.clientX - point.x, offsetY: event.clientY - point.y });
-  }
+    const sourceIndex = orderedBlocks.findIndex(item => item.block.id === sourceId);
+    const targetIndex = orderedBlocks.findIndex(item => item.block.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
 
-  function moveBlock(event) {
-    if (!drag) return;
-    const board = boardRef.current;
-    const rect = board.getBoundingClientRect();
-    const next = {
-      ...layout,
-      [drag.id]: {
-        x: Math.max(0, event.clientX - rect.left + board.scrollLeft - drag.offsetX),
-        y: Math.max(0, event.clientY - rect.top + board.scrollTop - drag.offsetY)
-      }
-    };
-    setLayout(next);
-  }
+    const next = [...orderedBlocks];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    const positioned = next.map((item, index) => ({
+      ...item,
+      block: { ...item.block, position: index + 1 }
+    }));
 
-  async function finishBlockDrag() {
-    if (!drag) return;
-    const id = drag.id;
-    const current = layout[id];
-    setDrag(null);
-    if (!current) return;
-    await updateBlock(id, { x: current.x, y: current.y });
-    setLayout(previous => {
-      const next = { ...previous };
-      delete next[id];
-      return next;
-    });
+    setBlocks(positioned);
+    await Promise.all(positioned.map(item => updateBlock(item.block.id, { position: item.block.position })));
     refresh();
   }
 
@@ -338,26 +308,48 @@ function SpacePage({ navigate, spaceId }) {
         </form>
       </section>
 
-      <section className="block-board" ref={boardRef} onPointerMove={moveBlock} onPointerUp={finishBlockDrag} onPointerCancel={() => setDrag(null)}>
-        <div className="block-board-surface" style={boardSize} />
-        {blocks.map((item, index) => {
-          const pos = positionFor(item, index);
-          const blockSize = sizeFor(item.block);
-          return (
-            <article className="block-card" key={item.block.id} style={{ left: pos.x, top: pos.y, width: blockSize.width, minHeight: blockSize.height }}>
-              <header className="block-header" onPointerDown={event => startBlockDrag(event, item, index)}>
-                <div>
-                  <span>{item.block.type}</span>
-                  <h2>{item.block.title}</h2>
-                </div>
-                <button className="button danger small" onPointerDown={event => event.stopPropagation()} onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
-              </header>
-              {item.block.type === "checklist" && <ChecklistBlock block={item.block} items={item.content || []} refresh={refresh} />}
-              {item.block.type === "table" && <TableBlock block={item.block} rows={item.content || []} refresh={refresh} />}
-              {item.block.type === "diagram" && <DiagramBlock block={item.block} content={item.content} refresh={refresh} />}
-            </article>
-          );
-        })}
+      <section
+        className="block-grid"
+        onDragOver={event => event.preventDefault()}
+        onDrop={event => {
+          if (event.target !== event.currentTarget) return;
+          event.preventDefault();
+          const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggedBlockId;
+          const lastBlock = orderedBlocks[orderedBlocks.length - 1];
+          if (lastBlock) reorderBlocks(sourceId, lastBlock.block.id);
+        }}
+      >
+        {orderedBlocks.map(item => (
+          <article
+            className={`block-card block-${item.block.type} ${draggedBlockId === item.block.id ? "dragging" : ""} ${dropTargetId === item.block.id && draggedBlockId !== item.block.id ? "drop-target" : ""}`}
+            key={item.block.id}
+            onDragOver={event => allowDrop(event, item.block.id)}
+            onDrop={event => {
+              event.preventDefault();
+              const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggedBlockId;
+              reorderBlocks(sourceId, item.block.id);
+            }}
+          >
+            <header
+              className="block-header"
+              draggable
+              onDragStart={event => startReorder(event, item.block.id)}
+              onDragEnd={() => {
+                setDraggedBlockId(null);
+                setDropTargetId(null);
+              }}
+            >
+              <div>
+                <span>{item.block.type}</span>
+                <h2>{item.block.title}</h2>
+              </div>
+              <button className="button danger small" draggable="false" onDragStart={event => event.stopPropagation()} onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+            </header>
+            {item.block.type === "checklist" && <ChecklistBlock block={item.block} items={item.content || []} refresh={refresh} />}
+            {item.block.type === "table" && <TableBlock block={item.block} rows={item.content || []} refresh={refresh} />}
+            {item.block.type === "diagram" && <DiagramBlock block={item.block} content={item.content} refresh={refresh} />}
+          </article>
+        ))}
       </section>
     </AppShell>
   );
@@ -461,6 +453,15 @@ function TableBlock({ block, rows, refresh }) {
         {editingRow && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
       </form>
       <div className="rows">
+        {rows.length > 0 && (
+          <div className="data-row table-head">
+            <span>Task name</span>
+            <span>Status</span>
+            <span>Priority</span>
+            <span>Due date</span>
+            <span>Actions</span>
+          </div>
+        )}
         {rows.map(row => (
           <div className="data-row" key={row.id}>
             <span className="row-title">{row.title}</span>
@@ -707,20 +708,6 @@ function titleFor(type) {
   if (type === "table") return "New Table";
   if (type === "diagram") return "New Diagram";
   return "New Checklist";
-}
-
-function defaultBlockLayout(type, index) {
-  const size = BLOCK_SIZES[type] || BLOCK_SIZES.checklist;
-  return {
-    x: 32 + (index % 2) * 680,
-    y: 32 + Math.floor(index / 2) * 460,
-    width: size.width,
-    height: size.height
-  };
-}
-
-function numberOr(value, fallback) {
-  return Number.isFinite(value) ? value : fallback;
 }
 
 function parseJson(value) {
