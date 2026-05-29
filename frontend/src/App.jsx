@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   clearToken,
+  convertBlock,
   createBlock,
   createChecklistItem,
   createDiagram,
@@ -23,13 +24,16 @@ import {
   registerAccount,
   updateBlock,
   updateChecklistItem,
+  updateDiagramEdge,
   updateDiagramNode,
   updateTableRow
 } from "./services/api.js";
 
 const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb" };
 const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
-const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
+const BLOCK_TYPES = ["checklist", "table", "diagram"];
+const SHAPES = ["task", "note", "milestone", "process", "document", "database", "input", "output", "terminator", "card", "capsule", "stamp", "flag", "wave", "portal", "burst"];
+const EDGE_TYPES = ["arrow", "curved", "elbow", "dashed", "dotted", "dash-dot", "bold", "soft", "double", "plain"];
 
 function App() {
   const [route, setRoute] = useState(getRoute());
@@ -298,6 +302,11 @@ function SpacePage({ navigate, spaceId }) {
     refresh();
   }
 
+  async function convertAndRefresh(block, targetType) {
+    await convertBlock(block.id, targetType);
+    await refresh();
+  }
+
   return (
     <AppShell navigate={navigate}>
       <section className="space-title">
@@ -358,7 +367,10 @@ function SpacePage({ navigate, spaceId }) {
                 <span>{item.block.type}</span>
                 <h2>{item.block.title}</h2>
               </div>
-              <button className="button danger small" draggable="false" onDragStart={event => event.stopPropagation()} onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+              <div className="block-actions" draggable="false" onDragStart={event => event.stopPropagation()}>
+                <ConversionMenu block={item.block} onConvert={targetType => convertAndRefresh(item.block, targetType)} />
+                <button className="button danger small" onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+              </div>
             </header>
             {item.block.type === "checklist" && <ChecklistBlock block={item.block} items={item.content || []} refresh={refresh} />}
             {item.block.type === "table" && <TableBlock block={item.block} rows={item.content || []} refresh={refresh} />}
@@ -367,6 +379,24 @@ function SpacePage({ navigate, spaceId }) {
         ))}
       </section>
     </AppShell>
+  );
+}
+
+function ConversionMenu({ block, onConvert }) {
+  const options = BLOCK_TYPES.filter(type => type !== block.type);
+
+  return (
+    <details className="convert-dropdown">
+      <summary>Convert</summary>
+      <div className="convert-menu">
+        {options.map(type => (
+          <button type="button" key={type} onClick={() => onConvert(type)}>
+            <span>Convert to</span>
+            {titleFor(type).replace("New ", "")}
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -484,8 +514,8 @@ function TableBlock({ block, rows, refresh }) {
         {rows.map(row => (
           <div className="data-row" key={row.id}>
             <span className="row-title">{row.title}</span>
-            <span>{row.status}</span>
-            <span>{row.priority || "none"}</span>
+            <span><StatusBadge status={row.status} /></span>
+            <span><PriorityBadge priority={row.priority || "low"} /></span>
             <span>{row.dueDate || "no date"}</span>
             <div className="row-actions">
               <button className="button secondary small" type="button" onClick={() => editRow(row)}>Edit</button>
@@ -498,26 +528,44 @@ function TableBlock({ block, rows, refresh }) {
   );
 }
 
+function StatusBadge({ status }) {
+  const value = status || "todo";
+  return <span className={`badge status-${value}`}>{value}</span>;
+}
+
+function PriorityBadge({ priority }) {
+  const value = priority || "low";
+  return <span className={`badge priority-${value}`}>{value}</span>;
+}
+
 function DiagramBlock({ block, content, refresh }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [connectionNodes, setConnectionNodes] = useState([]);
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [drag, setDrag] = useState(null);
   const [draft, setDraft] = useState({ label: "", type: "task", color: "#2563eb" });
+  const [edgeDraft, setEdgeDraft] = useState({ label: "", type: "arrow" });
   const diagram = content?.diagram;
   const nodes = content?.nodes || [];
   const edges = content?.edges || [];
+  const selectedEdgeId = [...selectedEdges][0] || null;
+  const selectedEdge = edges.find(edge => edge.id === selectedEdgeId);
 
   useEffect(() => {
     function onKeyDown(event) {
+      if (isTextInput(event.target)) return;
       if (event.key === "Backspace" && selectedEdges.size) {
         event.preventDefault();
         deleteSelectedEdges();
       }
+      if (event.key === "Enter" && connectionNodes.length === 2 && diagram) {
+        event.preventDefault();
+        connectSelectedNodes();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedEdges, edges]);
+  }, [selectedEdges, connectionNodes, diagram, edgeDraft, edges]);
 
   useEffect(() => {
     if (!selectedNode) return;
@@ -541,6 +589,7 @@ function DiagramBlock({ block, content, refresh }) {
     setSelectedEdges(new Set());
     setConnectionNodes([]);
     setDraft({ label: "", type: "task", color: "#2563eb" });
+    setEdgeDraft({ label: "", type: "arrow" });
   }
 
   async function ensureDiagram() {
@@ -579,8 +628,24 @@ function DiagramBlock({ block, content, refresh }) {
 
   async function connectSelectedNodes() {
     if (!diagram || connectionNodes.length !== 2 || connectionNodes[0] === connectionNodes[1]) return;
-    await createDiagramEdge(diagram.id, { sourceNodeId: connectionNodes[0], targetNodeId: connectionNodes[1], type: "arrow", label: "", styleJson: "{}" });
+    await createDiagramEdge(diagram.id, {
+      sourceNodeId: connectionNodes[0],
+      targetNodeId: connectionNodes[1],
+      type: edgeDraft.type,
+      label: edgeDraft.label.trim(),
+      styleJson: "{}"
+    });
     setConnectionNodes([]);
+    setEdgeDraft({ label: "", type: "arrow" });
+    refresh();
+  }
+
+  async function saveSelectedEdge() {
+    if (!selectedEdgeId) return;
+    await updateDiagramEdge(selectedEdgeId, {
+      label: edgeDraft.label.trim(),
+      type: edgeDraft.type
+    });
     refresh();
   }
 
@@ -620,6 +685,11 @@ function DiagramBlock({ block, content, refresh }) {
         <button className="button secondary small" disabled={connectionNodes.length !== 2 || !diagram} onClick={connectSelectedNodes}>Connect</button>
         <button className="button danger small" disabled={!selectedNode} onClick={removeNode}>Delete shape</button>
         <button className="button danger small" disabled={!selectedEdges.size} onClick={deleteSelectedEdges}>Delete arrow</button>
+        <input className="edge-label-input" placeholder={selectedEdge ? "Arrow label" : "New arrow label"} value={edgeDraft.label} onChange={event => setEdgeDraft({ ...edgeDraft, label: event.target.value })} />
+        <select className="edge-type-select" value={edgeDraft.type} onChange={event => setEdgeDraft({ ...edgeDraft, type: event.target.value })}>
+          {EDGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+        </select>
+        <button className="button secondary small" disabled={!selectedEdge} onClick={saveSelectedEdge}>Save arrow</button>
       </div>
       <div
         className="diagram-canvas"
@@ -634,7 +704,10 @@ function DiagramBlock({ block, content, refresh }) {
         <svg className="edge-layer">
           <defs>
             <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+              <path d="M0,0 L0,6 L9,3 z" fill="#5d4b40" />
+            </marker>
+            <marker id="arrow-start" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto">
+              <path d="M9,0 L9,6 L0,3 z" fill="#5d4b40" />
             </marker>
           </defs>
           {edges.map(edge => {
@@ -642,23 +715,34 @@ function DiagramBlock({ block, content, refresh }) {
             const target = renderedNodes.find(node => node.id === edge.targetNodeId);
             if (!source || !target) return null;
             const selected = selectedEdges.has(edge.id);
+            const type = edge.type || "arrow";
+            const geometry = edgeGeometry(source, target, type);
+            const label = edge.label?.trim();
             return (
-              <line
+              <g
                 key={edge.id}
-                x1={source.x + source.width / 2}
-                y1={source.y + source.height / 2}
-                x2={target.x + target.width / 2}
-                y2={target.y + target.height / 2}
-                className={selected ? "edge selected" : "edge"}
-                markerEnd="url(#arrow)"
+                className="edge-group"
                 onClick={event => {
                   event.stopPropagation();
                   setSelectedEdges(new Set([edge.id]));
                   setSelectedNode(null);
                   setConnectionNodes([]);
                   setDraft({ label: "", type: "task", color: "#2563eb" });
+                  setEdgeDraft({ label: edge.label || "", type });
                 }}
-              />
+              >
+                <path
+                  d={geometry.path}
+                  className={`edge edge-${type} ${selected ? "selected" : ""}`}
+                  markerStart={type === "double" ? "url(#arrow-start)" : undefined}
+                  markerEnd={type === "plain" ? undefined : "url(#arrow)"}
+                />
+                {label && (
+                  <text className={`edge-label ${selected ? "selected" : ""}`} x={geometry.label.x} y={geometry.label.y - 8}>
+                    {label}
+                  </text>
+                )}
+              </g>
             );
           })}
         </svg>
@@ -668,7 +752,7 @@ function DiagramBlock({ block, content, refresh }) {
             <button
               key={node.id}
               className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
-              style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb" }}
+              style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb", "--node-color": style.color || "#2563eb" }}
               onClick={event => {
                 event.stopPropagation();
                 selectNode(node.id);
@@ -783,6 +867,78 @@ function validateRegistration(form) {
   }
 
   return errors;
+}
+
+function isTextInput(target) {
+  if (!target) return false;
+  const tag = target.tagName?.toLowerCase();
+  return tag === "input" || tag === "select" || tag === "textarea" || target.isContentEditable;
+}
+
+function edgeGeometry(source, target, type) {
+  const sourceCenter = centerOf(source);
+  const targetCenter = centerOf(target);
+  const start = pointOnRectEdge(source, targetCenter);
+  const end = pointOnRectEdge(target, sourceCenter);
+
+  if (type === "curved") {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const curve = Math.min(Math.max(distance * 0.18, 34), 92);
+    const control = {
+      x: (start.x + end.x) / 2 - (dy / distance) * curve,
+      y: (start.y + end.y) / 2 + (dx / distance) * curve
+    };
+    return {
+      path: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
+      label: pointOnQuadratic(start, control, end, 0.5)
+    };
+  }
+
+  if (type === "elbow") {
+    const midX = (start.x + end.x) / 2;
+    return {
+      path: `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`,
+      label: { x: midX, y: (start.y + end.y) / 2 }
+    };
+  }
+
+  return {
+    path: `M ${start.x} ${start.y} L ${end.x} ${end.y}`,
+    label: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+  };
+}
+
+function centerOf(node) {
+  return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
+}
+
+function pointOnRectEdge(node, toward) {
+  const center = centerOf(node);
+  const dx = toward.x - center.x;
+  const dy = toward.y - center.y;
+  if (dx === 0 && dy === 0) return center;
+
+  const halfWidth = Math.max(node.width / 2, 1);
+  const halfHeight = Math.max(node.height / 2, 1);
+  const scale = Math.min(
+      Math.abs(dx) < 0.001 ? Number.POSITIVE_INFINITY : halfWidth / Math.abs(dx),
+      Math.abs(dy) < 0.001 ? Number.POSITIVE_INFINITY : halfHeight / Math.abs(dy)
+  );
+
+  return {
+    x: center.x + dx * scale,
+    y: center.y + dy * scale
+  };
+}
+
+function pointOnQuadratic(start, control, end, t) {
+  const inverse = 1 - t;
+  return {
+    x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+    y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
+  };
 }
 
 function parseJson(value) {

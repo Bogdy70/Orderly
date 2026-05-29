@@ -41,6 +41,14 @@ public class BlockService {
     return blockRepository.save(block);
   }
 
+  void shiftPositionsAfter(Long spaceId, Integer position) {
+    int sourcePosition = position == null ? 0 : position;
+    blockRepository.findBySpaceIdOrderByPositionAscIdAsc(spaceId)
+        .stream()
+        .filter(block -> (block.getPosition() == null ? 0 : block.getPosition()) > sourcePosition)
+        .forEach(block -> block.setPosition((block.getPosition() == null ? 0 : block.getPosition()) + 1));
+  }
+
   @Transactional(readOnly = true)
   public List<BlockDtos.BlockResponse> listBySpace(Long spaceId) {
     return blockRepository.findBySpaceIdOrderByPositionAscIdAsc(spaceId)
