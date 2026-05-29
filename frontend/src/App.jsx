@@ -30,7 +30,7 @@ import {
 
 const EMPTY_SPACE = { name: "", description: "", icon: "folder", color: "#2563eb" };
 const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
-const SHAPES = ["task", "note", "decision", "milestone"];
+const SHAPES = ["task", "note", "decision", "milestone", "process", "document", "database", "input", "output", "terminator"];
 const BLOCK_SIZES = {
   checklist: { width: 560, height: 360 },
   table: { width: 820, height: 400 },
@@ -365,17 +365,37 @@ function SpacePage({ navigate, spaceId }) {
 
 function ChecklistBlock({ block, items, refresh }) {
   const [text, setText] = useState("");
+  const [editingItem, setEditingItem] = useState(null);
+
+  function editItem(item) {
+    setEditingItem(item);
+    setText(item.text);
+  }
+
+  function clearEdit() {
+    setEditingItem(null);
+    setText("");
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const nextText = text.trim();
+    if (!nextText) return;
+    if (editingItem) {
+      await updateChecklistItem(editingItem.id, { text: nextText });
+    } else {
+      await createChecklistItem(block.id, { text: nextText, done: false, position: items.length + 1 });
+    }
+    clearEdit();
+    refresh();
+  }
+
   return (
     <div className="block-body">
-      <form className="inline-form" onSubmit={async event => {
-        event.preventDefault();
-        if (!text.trim()) return;
-        await createChecklistItem(block.id, { text, done: false, position: items.length + 1 });
-        setText("");
-        refresh();
-      }}>
+      <form className="inline-form editable-form" onSubmit={submit}>
         <input placeholder="Checklist item" value={text} onChange={event => setText(event.target.value)} />
-        <button className="button primary small">Add</button>
+        <button className="button primary small">{editingItem ? "Save" : "Add"}</button>
+        {editingItem && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
       </form>
       <ul className="checklist">
         {items.map(item => (
@@ -384,7 +404,10 @@ function ChecklistBlock({ block, items, refresh }) {
               <input type="checkbox" checked={item.done} onChange={() => updateChecklistItem(item.id, { done: !item.done }).then(refresh)} />
               <span className={item.done ? "done" : ""}>{item.text}</span>
             </label>
-            <button className="text-danger" onClick={() => deleteChecklistItem(item.id).then(refresh)}>Delete</button>
+            <div className="row-actions">
+              <button className="button secondary small" type="button" onClick={() => editItem(item)}>Edit</button>
+              <button className="text-danger" type="button" onClick={() => deleteChecklistItem(item.id).then(refresh)}>Delete</button>
+            </div>
           </li>
         ))}
       </ul>
@@ -394,11 +417,33 @@ function ChecklistBlock({ block, items, refresh }) {
 
 function TableBlock({ block, rows, refresh }) {
   const [form, setForm] = useState({ title: "", status: "todo", priority: "", dueDate: "" });
+  const [editingRow, setEditingRow] = useState(null);
+
+  function editRow(row) {
+    setEditingRow(row);
+    setForm({
+      title: row.title || "",
+      status: row.status || "todo",
+      priority: row.priority || "",
+      dueDate: row.dueDate || ""
+    });
+  }
+
+  function clearEdit() {
+    setEditingRow(null);
+    setForm({ title: "", status: "todo", priority: "", dueDate: "" });
+  }
+
   async function submit(event) {
     event.preventDefault();
     if (!form.title.trim()) return;
-    await createTableRow(block.id, { ...form, dueDate: form.dueDate || null, position: rows.length + 1 });
-    setForm({ title: "", status: "todo", priority: "", dueDate: "" });
+    const payload = { ...form, title: form.title.trim(), priority: form.priority || null, dueDate: form.dueDate || null };
+    if (editingRow) {
+      await updateTableRow(editingRow.id, payload);
+    } else {
+      await createTableRow(block.id, { ...payload, position: rows.length + 1 });
+    }
+    clearEdit();
     refresh();
   }
   return (
@@ -412,16 +457,20 @@ function TableBlock({ block, rows, refresh }) {
         </select>
         <input placeholder="Priority" value={form.priority || ""} onChange={event => setForm({ ...form, priority: event.target.value })} />
         <input type="date" value={form.dueDate || ""} onChange={event => setForm({ ...form, dueDate: event.target.value })} />
-        <button className="button primary small">Add</button>
+        <button className="button primary small">{editingRow ? "Save" : "Add"}</button>
+        {editingRow && <button className="button secondary small icon-only" type="button" aria-label="Cancel edit" onClick={clearEdit}>X</button>}
       </form>
       <div className="rows">
         {rows.map(row => (
           <div className="data-row" key={row.id}>
-            <input value={row.title} onChange={event => updateTableRow(row.id, { title: event.target.value }).then(refresh)} />
+            <span className="row-title">{row.title}</span>
             <span>{row.status}</span>
             <span>{row.priority || "none"}</span>
             <span>{row.dueDate || "no date"}</span>
-            <button className="text-danger" onClick={() => deleteTableRow(row.id).then(refresh)}>Delete</button>
+            <div className="row-actions">
+              <button className="button secondary small" type="button" onClick={() => editRow(row)}>Edit</button>
+              <button className="text-danger" type="button" onClick={() => deleteTableRow(row.id).then(refresh)}>Delete</button>
+            </div>
           </div>
         ))}
       </div>
@@ -431,7 +480,7 @@ function TableBlock({ block, rows, refresh }) {
 
 function DiagramBlock({ block, content, refresh }) {
   const [selectedNode, setSelectedNode] = useState(null);
-  const [pendingNode, setPendingNode] = useState(null);
+  const [connectionNodes, setConnectionNodes] = useState([]);
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [drag, setDrag] = useState(null);
   const [draft, setDraft] = useState({ label: "", type: "task", color: "#2563eb" });
@@ -458,6 +507,22 @@ function DiagramBlock({ block, content, refresh }) {
     setDraft({ label: node.label, type: node.type || "task", color: style.color || "#2563eb" });
   }, [selectedNode]);
 
+  function selectNode(nodeId) {
+    setSelectedNode(nodeId);
+    setSelectedEdges(new Set());
+    setConnectionNodes(current => {
+      if (current.includes(nodeId)) return current;
+      return [...current, nodeId].slice(-2);
+    });
+  }
+
+  function clearNodeForm() {
+    setSelectedNode(null);
+    setSelectedEdges(new Set());
+    setConnectionNodes([]);
+    setDraft({ label: "", type: "task", color: "#2563eb" });
+  }
+
   async function ensureDiagram() {
     if (diagram) return diagram;
     await createDiagram(block.id);
@@ -465,7 +530,17 @@ function DiagramBlock({ block, content, refresh }) {
     return null;
   }
 
-  async function addNode() {
+  async function submitNode() {
+    if (selectedNode) {
+      await updateDiagramNode(selectedNode, {
+        label: draft.label || "New node",
+        type: draft.type,
+        styleJson: JSON.stringify({ color: draft.color })
+      });
+      refresh();
+      return;
+    }
+
     const currentDiagram = await ensureDiagram();
     if (!currentDiagram) return;
     await createDiagramNode(currentDiagram.id, {
@@ -482,31 +557,18 @@ function DiagramBlock({ block, content, refresh }) {
     refresh();
   }
 
-  async function connectNode(nodeId) {
-    setSelectedNode(nodeId);
-    if (!pendingNode || pendingNode === nodeId) {
-      setPendingNode(nodeId);
-      return;
-    }
-    await createDiagramEdge(diagram.id, { sourceNodeId: pendingNode, targetNodeId: nodeId, type: "arrow", label: "", styleJson: "{}" });
-    setPendingNode(null);
-    refresh();
-  }
-
-  async function saveNode() {
-    if (!selectedNode) return;
-    await updateDiagramNode(selectedNode, {
-      label: draft.label,
-      type: draft.type,
-      styleJson: JSON.stringify({ color: draft.color })
-    });
+  async function connectSelectedNodes() {
+    if (!diagram || connectionNodes.length !== 2 || connectionNodes[0] === connectionNodes[1]) return;
+    await createDiagramEdge(diagram.id, { sourceNodeId: connectionNodes[0], targetNodeId: connectionNodes[1], type: "arrow", label: "", styleJson: "{}" });
+    setConnectionNodes([]);
     refresh();
   }
 
   async function removeNode() {
     if (!selectedNode) return;
     await deleteDiagramNode(selectedNode);
-    setSelectedNode(null);
+    clearNodeForm();
+    setConnectionNodes(current => current.filter(id => id !== selectedNode));
     refresh();
   }
 
@@ -533,8 +595,9 @@ function DiagramBlock({ block, content, refresh }) {
           {SHAPES.map(shape => <option key={shape}>{shape}</option>)}
         </select>
         <input type="color" value={draft.color} onChange={event => setDraft({ ...draft, color: event.target.value })} />
-        <button className="button primary small" onClick={addNode}>Add shape</button>
-        <button className="button secondary small" disabled={!selectedNode} onClick={saveNode}>Save shape</button>
+        <button className="button primary small" onClick={submitNode}>{selectedNode ? "Save shape" : "Add shape"}</button>
+        <button className="button secondary small" onClick={clearNodeForm}>Clear</button>
+        <button className="button secondary small" disabled={connectionNodes.length !== 2 || !diagram} onClick={connectSelectedNodes}>Connect</button>
         <button className="button danger small" disabled={!selectedNode} onClick={removeNode}>Delete shape</button>
         <button className="button danger small" disabled={!selectedEdges.size} onClick={deleteSelectedEdges}>Delete arrow</button>
       </div>
@@ -566,6 +629,9 @@ function DiagramBlock({ block, content, refresh }) {
                 onClick={event => {
                   event.stopPropagation();
                   setSelectedEdges(new Set([edge.id]));
+                  setSelectedNode(null);
+                  setConnectionNodes([]);
+                  setDraft({ label: "", type: "task", color: "#2563eb" });
                 }}
               />
             );
@@ -576,9 +642,9 @@ function DiagramBlock({ block, content, refresh }) {
           return (
             <button
               key={node.id}
-              className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${pendingNode === node.id ? "pending" : ""}`}
+              className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
               style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb" }}
-              onClick={() => connectNode(node.id)}
+              onClick={() => selectNode(node.id)}
               onPointerDown={event => {
                 event.stopPropagation();
                 setDrag({ id: node.id, x: node.x, y: node.y, offsetX: event.nativeEvent.offsetX, offsetY: event.nativeEvent.offsetY });

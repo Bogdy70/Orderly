@@ -101,7 +101,8 @@ h1, h2, p { margin-top: 0; }
 .space-form { grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
 .block-form { grid-template-columns: 180px minmax(220px, 1fr) auto; align-items: end; }
 .inline-form { grid-template-columns: minmax(0, 1fr) auto; }
-.table-form { grid-template-columns: 1.2fr 110px 110px 140px auto; align-items: end; }
+.editable-form { grid-template-columns: minmax(0, 1fr) auto auto; }
+.table-form { grid-template-columns: 1.2fr 110px 110px 140px auto auto; align-items: end; }
 
 label span {
   display: block;
@@ -150,6 +151,7 @@ select:focus {
 .button.secondary { border-color: var(--line); background: #fff; color: #334155; }
 .button.danger { border-color: #efc4c2; background: #fff; color: var(--danger); }
 .button.small { min-height: 32px; padding-inline: 10px; font-size: 0.86rem; }
+.button.icon-only { width: 34px; padding-inline: 0; }
 .link-button, .brand, .text-danger {
   border: 0;
   background: transparent;
@@ -346,6 +348,22 @@ select:focus {
   grid-template-columns: minmax(220px, 1fr) 100px 100px 110px auto;
 }
 
+.row-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .diagram-shell {
   display: grid;
   gap: 10px;
@@ -406,17 +424,25 @@ select:focus {
   touch-action: none;
 }
 
-.diagram-node.task { border-radius: 8px; }
+.diagram-node.task,
+.diagram-node.process { border-radius: 8px; }
 .diagram-node.note { border-radius: 18px; }
 .diagram-node.decision {
-  transform: rotate(45deg);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  padding-inline: 24px;
 }
-.diagram-node.decision::first-line {
-  transform: rotate(-45deg);
+.diagram-node.milestone,
+.diagram-node.terminator { border-radius: 999px; }
+.diagram-node.document { border-radius: 8px 18px 8px 8px; }
+.diagram-node.database { border-radius: 50% / 14%; }
+.diagram-node.input,
+.diagram-node.output {
+  clip-path: polygon(12% 0, 100% 0, 88% 100%, 0 100%);
+  padding-inline: 20px;
 }
-.diagram-node.milestone { border-radius: 999px; }
 .diagram-node.selected { outline: 3px solid rgba(37, 99, 235, 0.22); }
-.diagram-node.pending { background: #eff6ff; }
+.diagram-node.connect-start { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2), 0 8px 18px rgba(15, 23, 42, 0.12); }
+.diagram-node.connect-target { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.24), 0 8px 18px rgba(15, 23, 42, 0.12); }
 
 @media (max-width: 980px) {
   .auth-layout,
@@ -442,5 +468,9 @@ select:focus {
 
   .data-row {
     grid-template-columns: 1fr;
+  }
+
+  .editable-form {
+    grid-template-columns: 1fr auto auto;
   }
 }
