@@ -52,6 +52,10 @@ final class DtoMapper {
         block.getType().value(),
         block.getTitle(),
         block.getPosition(),
+        block.getX(),
+        block.getY(),
+        block.getWidth(),
+        block.getHeight(),
         block.getCreatedAt(),
         block.getUpdatedAt()
     );

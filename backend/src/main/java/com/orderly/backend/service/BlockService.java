@@ -27,6 +27,7 @@ public class BlockService {
     block.setType(BlockType.fromValue(request.type()));
     block.setTitle(request.title());
     block.setPosition(request.position() == null ? 0 : request.position());
+    applyLayout(block, request.x(), request.y(), request.width(), request.height());
     return DtoMapper.toBlock(blockRepository.save(block));
   }
 
@@ -36,6 +37,7 @@ public class BlockService {
     block.setType(type);
     block.setTitle(title);
     block.setPosition(position == null ? 0 : position);
+    applyDefaultLayout(block, type);
     return blockRepository.save(block);
   }
 
@@ -56,6 +58,10 @@ public class BlockService {
     BlockEntity block = getEntity(id);
     if (request.title() != null) block.setTitle(request.title());
     if (request.position() != null) block.setPosition(request.position());
+    if (request.x() != null) block.setX(request.x());
+    if (request.y() != null) block.setY(request.y());
+    if (request.width() != null) block.setWidth(request.width());
+    if (request.height() != null) block.setHeight(request.height());
     return DtoMapper.toBlock(block);
   }
 
@@ -68,4 +74,21 @@ public class BlockService {
         .orElseThrow(() -> ApiException.notFound("Block not found."));
   }
 
+  private void applyLayout(BlockEntity block, Double x, Double y, Double width, Double height) {
+    if (x != null) block.setX(x);
+    if (y != null) block.setY(y);
+    if (width != null) block.setWidth(width);
+    if (height != null) block.setHeight(height);
+    applyDefaultLayout(block, block.getType());
+  }
+
+  private void applyDefaultLayout(BlockEntity block, BlockType type) {
+    int index = Math.max((block.getPosition() == null ? 1 : block.getPosition()) - 1, 0);
+    if (block.getX() == null) block.setX(32.0 + (index % 2) * 680.0);
+    if (block.getY() == null) block.setY(32.0 + Math.floor(index / 2.0) * 460.0);
+    if (block.getWidth() == null || block.getWidth() <= 0) {
+      block.setWidth(type == BlockType.CHECKLIST ? 560.0 : type == BlockType.TABLE ? 820.0 : 780.0);
+    }
+    if (block.getHeight() == null || block.getHeight() <= 0) block.setHeight(type == BlockType.DIAGRAM ? 620.0 : 360.0);
+  }
 }

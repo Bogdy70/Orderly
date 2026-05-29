@@ -1,0 +1,22 @@
+ALTER TABLE blocks
+  ADD COLUMN x DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ADD COLUMN y DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ADD COLUMN width DOUBLE PRECISION NOT NULL DEFAULT 560,
+  ADD COLUMN height DOUBLE PRECISION NOT NULL DEFAULT 360;
+
+UPDATE blocks
+SET
+  x = CASE ((position - 1) % 2)
+    WHEN 0 THEN 32
+    ELSE 712
+  END,
+  y = 32 + FLOOR((position - 1) / 2) * 460,
+  width = CASE type
+    WHEN 'table' THEN 820
+    WHEN 'diagram' THEN 780
+    ELSE 560
+  END,
+  height = CASE type
+    WHEN 'diagram' THEN 620
+    ELSE 360
+  END;

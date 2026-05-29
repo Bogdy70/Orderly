@@ -55,7 +55,7 @@ class BlockControllerTest {
 
     mockMvc.perform(post("/api/spaces/4/blocks")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(new BlockDtos.CreateBlockRequest("checklist", "Today", 1))))
+            .content(objectMapper.writeValueAsString(new BlockDtos.CreateBlockRequest("checklist", "Today", 1, 32.0, 32.0, 560.0, 360.0))))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(10))
         .andExpect(jsonPath("$.spaceId").value(4))
@@ -104,7 +104,7 @@ class BlockControllerTest {
 
     mockMvc.perform(patch("/api/blocks/10")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(new BlockDtos.UpdateBlockRequest("Later", 2))))
+            .content(objectMapper.writeValueAsString(new BlockDtos.UpdateBlockRequest("Later", 2, 44.0, 48.0, 560.0, 360.0))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("Later"))
         .andExpect(jsonPath("$.position").value(2));
@@ -112,6 +112,6 @@ class BlockControllerTest {
 
   private BlockDtos.BlockResponse blockResponse(Long id, Long spaceId, String type, String title, Integer position) {
     Instant now = Instant.parse("2026-05-29T10:00:00Z");
-    return new BlockDtos.BlockResponse(id, spaceId, type, title, position, now, now);
+    return new BlockDtos.BlockResponse(id, spaceId, type, title, position, 32.0, 32.0, 560.0, 360.0, now, now);
   }
 }

@@ -11,13 +11,21 @@ public final class BlockDtos {
   public record CreateBlockRequest(
       @NotBlank String type,
       @NotBlank String title,
-      Integer position
+      Integer position,
+      Double x,
+      Double y,
+      Double width,
+      Double height
   ) {
   }
 
   public record UpdateBlockRequest(
       String title,
-      Integer position
+      Integer position,
+      Double x,
+      Double y,
+      Double width,
+      Double height
   ) {
   }
 
@@ -27,6 +35,10 @@ public final class BlockDtos {
       String type,
       String title,
       Integer position,
+      Double x,
+      Double y,
+      Double width,
+      Double height,
       Instant createdAt,
       Instant updatedAt
   ) {
