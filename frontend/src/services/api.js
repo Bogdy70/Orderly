@@ -3,6 +3,9 @@ const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL || "http://localhost:8081
 const KEYCLOAK_REALM = import.meta.env.VITE_KEYCLOAK_REALM || "orderly";
 const KEYCLOAK_CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "orderly-frontend";
 const TOKEN_KEY = "orderlyAccessToken";
+const REFRESH_TOKEN_KEY = "orderlyRefreshToken";
+let refreshPromise = null;
+let keepAliveTimer = null;
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -14,6 +17,7 @@ export function setToken(token) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export function isAuthenticated() {
@@ -52,8 +56,109 @@ export async function login(username, password) {
   }
 
   const data = await response.json();
-  setToken(data.access_token);
+  setSession(data);
   return data.access_token;
+}
+
+function setSession(data) {
+  if (data.access_token) localStorage.setItem(TOKEN_KEY, data.access_token);
+  if (data.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+}
+
+async function getValidToken() {
+  const token = getToken();
+  if (!token) return "";
+  if (!isTokenExpiring(token)) return token;
+  return refreshAccessToken();
+}
+
+function isTokenExpiring(token, skewSeconds = 30) {
+  const claims = decodeToken(token);
+  if (!claims.exp) return false;
+  return claims.exp * 1000 <= Date.now() + skewSeconds * 1000;
+}
+
+async function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = refreshAccessTokenOnce()
+      .finally(() => {
+        refreshPromise = null;
+      });
+
+  return refreshPromise;
+}
+
+export function startAuthKeepAlive(onExpired) {
+  stopAuthKeepAlive();
+
+  async function keepAlive() {
+    if (!getToken()) return;
+
+    try {
+      await getValidToken();
+    } catch (error) {
+      if (error.status === 401) onExpired?.();
+    }
+  }
+
+  keepAliveTimer = window.setInterval(keepAlive, 60_000);
+  window.addEventListener("focus", keepAlive);
+  document.addEventListener("visibilitychange", keepAlive);
+  keepAlive();
+
+  return () => {
+    stopAuthKeepAlive();
+    window.removeEventListener("focus", keepAlive);
+    document.removeEventListener("visibilitychange", keepAlive);
+  };
+}
+
+function stopAuthKeepAlive() {
+  if (!keepAliveTimer) return;
+  window.clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
+}
+
+async function refreshAccessTokenOnce() {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refreshToken) {
+    clearToken();
+    notifyAuthExpired();
+    throw authExpiredError();
+  }
+
+  const body = new URLSearchParams({
+    client_id: KEYCLOAK_CLIENT_ID,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
+
+  const response = await fetch(`${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body
+  });
+
+  if (!response.ok) {
+    clearToken();
+    notifyAuthExpired();
+    throw authExpiredError();
+  }
+
+  const data = await response.json();
+  setSession(data);
+  return data.access_token;
+}
+
+function authExpiredError() {
+  const error = new Error("Your session expired. Please log in again.");
+  error.status = 401;
+  return error;
+}
+
+function notifyAuthExpired() {
+  window.dispatchEvent(new CustomEvent("orderly:auth-expired"));
 }
 
 export async function registerAccount(payload) {
@@ -170,6 +275,10 @@ export async function deleteDiagramEdge(edgeId) {
 }
 
 async function apiFetch(path, options = {}) {
+  return apiFetchOnce(path, options, true);
+}
+
+async function apiFetchOnce(path, options = {}, allowRefreshRetry = true) {
   const { body, auth = true, ...rest } = options;
   const headers = {
     "Content-Type": "application/json",
@@ -177,7 +286,7 @@ async function apiFetch(path, options = {}) {
   };
 
   if (auth) {
-    const token = getToken();
+    const token = await getValidToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
@@ -191,6 +300,11 @@ async function apiFetch(path, options = {}) {
 
   const contentType = response.headers.get("content-type") || "";
   const data = contentType.includes("application/json") ? await response.json() : await response.text();
+
+  if (auth && response.status === 401 && allowRefreshRetry) {
+    await refreshAccessToken();
+    return apiFetchOnce(path, options, false);
+  }
 
   if (!response.ok) {
     const error = new Error(data?.message || "Request failed.");
