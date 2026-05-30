@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   clearToken,
   convertBlock,
@@ -22,6 +22,7 @@ import {
   listSpaces,
   login,
   registerAccount,
+  startAuthKeepAlive,
   updateBlock,
   updateChecklistItem,
   updateDiagramEdge,
@@ -42,6 +43,21 @@ function App() {
     const onPop = () => setRoute(getRoute());
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      clearToken();
+      navigate("/login.html");
+    }
+
+    const stopKeepAlive = startAuthKeepAlive(handleAuthExpired);
+    window.addEventListener("orderly:auth-expired", handleAuthExpired);
+
+    return () => {
+      stopKeepAlive();
+      window.removeEventListener("orderly:auth-expired", handleAuthExpired);
+    };
   }, []);
 
   function navigate(path) {
@@ -237,6 +253,8 @@ function DashboardPage({ navigate }) {
 function SpacePage({ navigate, spaceId }) {
   const [space, setSpace] = useState(null);
   const [blocks, setBlocks] = useState([]);
+  const [user, setUser] = useState(null);
+  const [message, setMessage] = useState("");
   const [blockForm, setBlockForm] = useState(EMPTY_BLOCK);
   const [draggedBlockId, setDraggedBlockId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
@@ -247,9 +265,20 @@ function SpacePage({ navigate, spaceId }) {
   }, [spaceId]);
 
   async function refresh() {
-    const data = await getSpaceFull(spaceId);
-    setSpace(data.space);
-    setBlocks(data.blocks || []);
+    try {
+      const [currentUser, data] = await Promise.all([getCurrentUser(), getSpaceFull(spaceId)]);
+      setUser(currentUser);
+      setSpace(data.space);
+      setBlocks(data.blocks || []);
+      setMessage("");
+    } catch (error) {
+      if (error.status === 401) {
+        clearToken();
+        navigate("/login.html");
+        return;
+      }
+      setMessage(error.message);
+    }
   }
 
   async function addBlock(event) {
@@ -308,7 +337,7 @@ function SpacePage({ navigate, spaceId }) {
   }
 
   return (
-    <AppShell navigate={navigate}>
+    <AppShell user={user} navigate={navigate}>
       <section className="space-title">
         <button className="button secondary" onClick={() => navigate("/dashboard.html")}>Back</button>
         <div>
@@ -316,6 +345,8 @@ function SpacePage({ navigate, spaceId }) {
           <p>{space?.description}</p>
         </div>
       </section>
+
+      {message && <Alert>{message}</Alert>}
 
       <section className="panel">
         <form className="block-form" onSubmit={addBlock}>
@@ -562,6 +593,7 @@ function DiagramBlock({ block, content, refresh }) {
   const [connectionNodes, setConnectionNodes] = useState([]);
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [drag, setDrag] = useState(null);
+  const dragRef = useRef(null);
   const [draft, setDraft] = useState({ label: "", type: "task", color: "#2563eb" });
   const [edgeDraft, setEdgeDraft] = useState({ label: "", type: "arrow" });
   const diagram = content?.diagram;
@@ -569,6 +601,10 @@ function DiagramBlock({ block, content, refresh }) {
   const edges = content?.edges || [];
   const selectedEdgeId = [...selectedEdges][0] || null;
   const selectedEdge = edges.find(edge => edge.id === selectedEdgeId);
+
+  useEffect(() => {
+    dragRef.current = drag;
+  }, [drag]);
 
   useEffect(() => {
     function onKeyDown(event) {
@@ -593,6 +629,41 @@ function DiagramBlock({ block, content, refresh }) {
     const style = parseJson(node.styleJson);
     setDraft({ label: node.label, type: node.type || "task", color: style.color || "#2563eb" });
   }, [selectedNode]);
+
+  useEffect(() => {
+    if (!drag) return;
+
+    function finishDrag() {
+      const activeDrag = dragRef.current;
+      if (!activeDrag) return;
+      dragRef.current = null;
+      setDrag(null);
+      updateDiagramNode(activeDrag.id, { x: activeDrag.x, y: activeDrag.y })
+        .then(refresh)
+        .catch(() => {});
+    }
+
+    function cancelDrag() {
+      dragRef.current = null;
+      setDrag(null);
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) cancelDrag();
+    }
+
+    window.addEventListener("pointerup", finishDrag);
+    window.addEventListener("pointercancel", cancelDrag);
+    window.addEventListener("blur", cancelDrag);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointercancel", cancelDrag);
+      window.removeEventListener("blur", cancelDrag);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [drag, refresh]);
 
   function selectNode(nodeId) {
     setSelectedNode(nodeId);
@@ -683,8 +754,10 @@ function DiagramBlock({ block, content, refresh }) {
   }
 
   async function endDrag() {
-    if (!drag) return;
-    await updateDiagramNode(drag.id, { x: drag.x, y: drag.y });
+    const activeDrag = dragRef.current;
+    if (!activeDrag) return;
+    dragRef.current = null;
+    await updateDiagramNode(activeDrag.id, { x: activeDrag.x, y: activeDrag.y });
     setDrag(null);
     refresh();
   }
@@ -719,6 +792,10 @@ function DiagramBlock({ block, content, refresh }) {
           setDrag({ ...drag, x: event.clientX - rect.left - drag.offsetX, y: event.clientY - rect.top - drag.offsetY });
         }}
         onPointerUp={endDrag}
+        onPointerCancel={() => {
+          dragRef.current = null;
+          setDrag(null);
+        }}
       >
         <svg className="edge-layer">
           <defs>
@@ -778,6 +855,7 @@ function DiagramBlock({ block, content, refresh }) {
               }}
               onPointerDown={event => {
                 event.stopPropagation();
+                event.currentTarget.setPointerCapture?.(event.pointerId);
                 setDrag({ id: node.id, x: node.x, y: node.y, offsetX: event.nativeEvent.offsetX, offsetY: event.nativeEvent.offsetY });
               }}
             >
