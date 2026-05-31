@@ -27,6 +27,7 @@ import {
   updateChecklistItem,
   updateDiagramEdge,
   updateDiagramNode,
+  updateSpace,
   updateTableRow
 } from "./services/api.js";
 
@@ -174,6 +175,7 @@ function DashboardPage({ navigate }) {
   const [spaces, setSpaces] = useState([]);
   const [user, setUser] = useState(null);
   const [form, setForm] = useState(EMPTY_SPACE);
+  const [editingSpaceId, setEditingSpaceId] = useState(null);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
 
@@ -195,14 +197,39 @@ function DashboardPage({ navigate }) {
     event.preventDefault();
     const payload = { ...form, name: form.name.trim(), description: form.description.trim() };
     if (!payload.name) return;
-    await createSpace(payload);
+    try {
+      if (editingSpaceId) {
+        await updateSpace(editingSpaceId, payload);
+      } else {
+        await createSpace(payload);
+      }
+      clearSpaceEdit();
+      await refresh();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  function editSpace(space) {
+    setEditingSpaceId(space.id);
+    setForm({
+      name: space.name || "",
+      description: space.description || "",
+      icon: space.icon || "folder",
+      color: space.color || "#2563eb"
+    });
+    setMessage("");
+  }
+
+  function clearSpaceEdit() {
+    setEditingSpaceId(null);
     setForm(EMPTY_SPACE);
-    refresh();
   }
 
   async function removeSpace(space) {
     if (!confirm(`Delete ${space.name}?`)) return;
     await deleteSpace(space.id);
+    if (editingSpaceId === space.id) clearSpaceEdit();
     refresh();
   }
 
@@ -219,7 +246,7 @@ function DashboardPage({ navigate }) {
       </section>
 
       <section className="panel">
-        <h2>Create space</h2>
+        <h2>{editingSpaceId ? "Edit space" : "Create space"}</h2>
         <form className="space-form" onSubmit={submit}>
           <Field label="Name" value={form.name} onChange={name => setForm({ ...form, name })} />
           <Field label="Description" value={form.description} onChange={description => setForm({ ...form, description })} />
@@ -228,7 +255,10 @@ function DashboardPage({ navigate }) {
             <span>Color</span>
             <input type="color" value={form.color} onChange={event => setForm({ ...form, color: event.target.value })} />
           </label>
-          <button className="button primary">Create</button>
+          <div className="form-actions">
+            <button className="button primary">{editingSpaceId ? "Save" : "Create"}</button>
+            {editingSpaceId && <button className="button secondary icon-only" type="button" aria-label="Cancel space edit" onClick={clearSpaceEdit}>X</button>}
+          </div>
         </form>
       </section>
 
@@ -241,6 +271,7 @@ function DashboardPage({ navigate }) {
             <p>{space.description || "No description yet."}</p>
             <div className="card-actions">
               <button className="button primary" onClick={() => navigate(`/project.html?id=${space.id}`)}>Open</button>
+              <button className="button secondary" onClick={() => editSpace(space)}>Edit</button>
               <button className="button danger" onClick={() => removeSpace(space)}>Delete</button>
             </div>
           </article>
@@ -256,6 +287,8 @@ function SpacePage({ navigate, spaceId }) {
   const [user, setUser] = useState(null);
   const [message, setMessage] = useState("");
   const [blockForm, setBlockForm] = useState(EMPTY_BLOCK);
+  const [editingBlockId, setEditingBlockId] = useState(null);
+  const [blockTitleDraft, setBlockTitleDraft] = useState("");
   const [draggedBlockId, setDraggedBlockId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
 
@@ -336,6 +369,25 @@ function SpacePage({ navigate, spaceId }) {
     await refresh();
   }
 
+  function editBlockTitle(block) {
+    setEditingBlockId(block.id);
+    setBlockTitleDraft(block.title || "");
+  }
+
+  function clearBlockTitleEdit() {
+    setEditingBlockId(null);
+    setBlockTitleDraft("");
+  }
+
+  async function saveBlockTitle(event, block) {
+    event.preventDefault();
+    const title = blockTitleDraft.trim();
+    if (!title) return;
+    await updateBlock(block.id, { title });
+    clearBlockTitleEdit();
+    await refresh();
+  }
+
   return (
     <AppShell user={user} navigate={navigate}>
       <section className="space-title">
@@ -387,20 +439,35 @@ function SpacePage({ navigate, spaceId }) {
           >
             <header
               className="block-header"
-              draggable
+              draggable={editingBlockId !== item.block.id}
               onDragStart={event => startReorder(event, item.block.id)}
               onDragEnd={() => {
                 setDraggedBlockId(null);
                 setDropTargetId(null);
               }}
             >
-              <div>
-                <span>{item.block.type}</span>
-                <h2>{item.block.title}</h2>
-              </div>
+              {editingBlockId === item.block.id ? (
+                <form className="block-title-form" onSubmit={event => saveBlockTitle(event, item.block)} draggable="false" onDragStart={event => event.stopPropagation()}>
+                  <span>{item.block.type}</span>
+                  <div className="block-title-edit-row">
+                    <input value={blockTitleDraft} onChange={event => setBlockTitleDraft(event.target.value)} autoFocus />
+                    <button className="button primary small">Save</button>
+                    <button className="button secondary small icon-only" type="button" aria-label="Cancel block title edit" onClick={clearBlockTitleEdit}>X</button>
+                  </div>
+                </form>
+              ) : (
+                <div>
+                  <span>{item.block.type}</span>
+                  <h2>{item.block.title}</h2>
+                </div>
+              )}
               <div className="block-actions" draggable="false" onDragStart={event => event.stopPropagation()}>
+                <button className="button secondary small" disabled={editingBlockId === item.block.id} onClick={() => editBlockTitle(item.block)}>Edit name</button>
                 <ConversionMenu block={item.block} onConvert={targetType => convertAndRefresh(item.block, targetType)} />
-                <button className="button danger small" onClick={() => deleteBlock(item.block.id).then(refresh)}>Delete</button>
+                <button className="button danger small" onClick={() => deleteBlock(item.block.id).then(() => {
+                  if (editingBlockId === item.block.id) clearBlockTitleEdit();
+                  refresh();
+                })}>Delete</button>
               </div>
             </header>
             {item.block.type === "checklist" && <ChecklistBlock block={item.block} items={item.content || []} refresh={refresh} />}
