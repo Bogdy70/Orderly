@@ -198,6 +198,10 @@ export async function createSpace(payload) {
   return apiFetch("/api/spaces", { method: "POST", body: payload });
 }
 
+export async function updateSpace(id, payload) {
+  return apiFetch(`/api/spaces/${id}`, { method: "PATCH", body: payload });
+}
+
 export async function deleteSpace(id) {
   return apiFetch(`/api/spaces/${id}`, { method: "DELETE" });
 }
