@@ -85,6 +85,7 @@ if (Test-Path ".env") {
 $frontendPort = if ($envValues.ContainsKey("FRONTEND_PORT")) { $envValues["FRONTEND_PORT"] } else { "5173" }
 $backendPort = if ($envValues.ContainsKey("BACKEND_PORT")) { $envValues["BACKEND_PORT"] } else { "8080" }
 $keycloakPort = if ($envValues.ContainsKey("KEYCLOAK_PORT")) { $envValues["KEYCLOAK_PORT"] } else { "8081" }
+$publicHost = if ($envValues.ContainsKey("PUBLIC_HOST")) { $envValues["PUBLIC_HOST"] } else { "localhost" }
 
 Wait-ForUrl -Name "keycloak" -Url "http://localhost:$keycloakPort/realms/orderly"
 Wait-ForUrl -Name "backend" -Url "http://localhost:$backendPort/v3/api-docs"
@@ -92,9 +93,14 @@ Wait-ForUrl -Name "frontend" -Url "http://localhost:$frontendPort"
 
 Write-Host ""
 Write-Host "Orderly is running."
-Write-Host "Frontend:  http://localhost:$frontendPort"
-Write-Host "Backend:   http://localhost:$backendPort/swagger-ui.html"
-Write-Host "Keycloak:  http://localhost:$keycloakPort/admin"
+Write-Host "Frontend:  http://$publicHost`:$frontendPort"
+Write-Host "Backend:   http://$publicHost`:$backendPort/swagger-ui.html"
+Write-Host "Keycloak:  http://$publicHost`:$keycloakPort/admin"
+if ($publicHost -ne "localhost") {
+    Write-Host ""
+    Write-Host "Local fallback:"
+    Write-Host "  http://localhost:$frontendPort"
+}
 Write-Host ""
 Write-Host "Default dev users:"
 Write-Host "  Keycloak admin: admin / admin"

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-orderly}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderly}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - orderly_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@orderly.local}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
     ports:
-      - "${PGADMIN_PORT:-5050}:80"
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
     volumes:
       - orderly_pgadmin_data:/var/lib/pgadmin
     depends_on:
@@ -67,7 +67,7 @@ services:
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8081}
+      KC_HOSTNAME: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8081}
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_PROXY_HEADERS: xforwarded
@@ -99,15 +99,15 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-orderly}
       DATABASE_USERNAME: ${POSTGRES_USER:-orderly}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-orderly}
-      KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8081}/realms/orderly
+      KEYCLOAK_ISSUER_URI: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8081}/realms/orderly
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/orderly/protocol/openid-connect/certs
       KEYCLOAK_SERVER_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-orderly}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KEYCLOAK_SWAGGER_CLIENT_ID: ${KEYCLOAK_SWAGGER_CLIENT_ID:-orderly-frontend}
-      SWAGGER_OAUTH2_REDIRECT_URL: http://localhost:${BACKEND_PORT:-8080}/swagger-ui/oauth2-redirect.html
-      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173},http://localhost:${BACKEND_PORT:-8080},http://127.0.0.1:${BACKEND_PORT:-8080}
+      SWAGGER_OAUTH2_REDIRECT_URL: http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}/swagger-ui/oauth2-redirect.html
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173},http://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-5173},http://localhost:${BACKEND_PORT:-8080},http://127.0.0.1:${BACKEND_PORT:-8080},http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}
       REQUIRE_VERIFIED_EMAIL: ${REQUIRE_VERIFIED_EMAIL:-false}
       PORT: 8080
     ports:
@@ -124,8 +124,8 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: http://localhost:${BACKEND_PORT:-8080}
-        VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_PORT:-8081}
+        VITE_API_BASE_URL: http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}
+        VITE_KEYCLOAK_URL: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8081}
         VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-orderly}
         VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_FRONTEND_CLIENT_ID:-orderly-frontend}
     container_name: orderly-frontend
