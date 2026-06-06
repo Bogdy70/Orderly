@@ -90,6 +90,8 @@ http://<tailscale-hostname-or-ip>:5173
 
 The Tailscale hostname is preferable when available because it is easier to reuse after restarts.
 
+Use the full `http://` URL with `:5173`. Opening only `http://<tailscale-hostname-or-ip>` uses port `80`, so it can show a different container if another app is publishing port 80.
+
 ## What The Remote Access Script Does
 
 `scripts/configure-remote-access.ps1`:
@@ -138,12 +140,23 @@ New-NetFirewallRule -DisplayName "Orderly Backend 8080" -Direction Inbound -Acti
 New-NetFirewallRule -DisplayName "Orderly Keycloak 8081" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8081
 ```
 
+For Tailscale-only access, you can scope the rules to Tailscale's CGNAT range:
+
+```powershell
+New-NetFirewallRule -DisplayName "Orderly Frontend 5173 Tailscale" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5173 -RemoteAddress 100.64.0.0/10
+New-NetFirewallRule -DisplayName "Orderly Backend 8080 Tailscale" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080 -RemoteAddress 100.64.0.0/10
+New-NetFirewallRule -DisplayName "Orderly Keycloak 8081 Tailscale" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8081 -RemoteAddress 100.64.0.0/10
+```
+
 Remove those rules later with:
 
 ```powershell
 Remove-NetFirewallRule -DisplayName "Orderly Frontend 5173"
 Remove-NetFirewallRule -DisplayName "Orderly Backend 8080"
 Remove-NetFirewallRule -DisplayName "Orderly Keycloak 8081"
+Remove-NetFirewallRule -DisplayName "Orderly Frontend 5173 Tailscale"
+Remove-NetFirewallRule -DisplayName "Orderly Backend 8080 Tailscale"
+Remove-NetFirewallRule -DisplayName "Orderly Keycloak 8081 Tailscale"
 ```
 
 Do not run broad firewall commands unless you understand the network you are exposing the app to.

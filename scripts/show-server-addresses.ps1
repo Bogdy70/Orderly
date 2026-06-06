@@ -21,7 +21,7 @@ function Get-LanAddresses {
 }
 
 function Get-TailscaleAddresses {
-    $tailscale = Get-Command tailscale -ErrorAction SilentlyContinue
+    $tailscale = Get-TailscaleCommand
     if (!$tailscale) {
         return [pscustomobject]@{
             Installed = $false
@@ -34,13 +34,13 @@ function Get-TailscaleAddresses {
     $self = ""
 
     try {
-        $ipv4 = @(tailscale ip -4 2>$null | Where-Object { $_ -and $_.Trim() -ne "" })
+        $ipv4 = @(& $tailscale ip -4 2>$null | Where-Object { $_ -and $_.Trim() -ne "" })
     } catch {
         $ipv4 = @()
     }
 
     try {
-        $self = (tailscale status --self 2>$null | Select-Object -First 1)
+        $self = (& $tailscale status --self 2>$null | Select-Object -First 1)
     } catch {
         $self = ""
     }
@@ -50,6 +50,29 @@ function Get-TailscaleAddresses {
         IPv4 = $ipv4
         Self = $self
     }
+}
+
+function Get-TailscaleCommand {
+    $command = Get-Command tailscale -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $candidates = @(
+        (Join-Path $env:ProgramFiles "Tailscale\tailscale.exe")
+    )
+
+    if (${env:ProgramFiles(x86)}) {
+        $candidates += (Join-Path ${env:ProgramFiles(x86)} "Tailscale\tailscale.exe")
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
 }
 
 $lanAddresses = @(Get-LanAddresses)

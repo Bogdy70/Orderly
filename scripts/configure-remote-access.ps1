@@ -63,15 +63,31 @@ function Invoke-Compose {
     $composeArgs += $Arguments
 
     if ($CaptureOutput) {
-        $output = & $compose[0] @composeArgs 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw ($output -join "`n")
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & $compose[0] @composeArgs
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+
+        if ($exitCode -ne 0) {
+            throw (($output | ForEach-Object { "$_" }) -join "`n")
         }
         return $output
     }
 
-    & $compose[0] @composeArgs
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $compose[0] @composeArgs
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($exitCode -ne 0) {
         throw "Docker Compose command failed: $($Arguments -join ' ')"
     }
 }
@@ -157,9 +173,17 @@ function Wait-ForUrl {
 }
 
 function Invoke-KeycloakAdmin {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [switch]$CaptureOutput
+    )
 
-    return Invoke-Compose -CaptureOutput -Arguments (@("exec", "-T", "keycloak", "/opt/keycloak/bin/kcadm.sh") + $Arguments)
+    $composeArgs = @("exec", "-T", "keycloak", "/opt/keycloak/bin/kcadm.sh") + $Arguments
+    if ($CaptureOutput) {
+        return Invoke-Compose -CaptureOutput -Arguments $composeArgs
+    }
+
+    Invoke-Compose -Arguments $composeArgs
 }
 
 function Add-UniqueValues {
@@ -204,14 +228,14 @@ function Get-KeycloakClient {
         [string]$ClientId
     )
 
-    $json = (Invoke-KeycloakAdmin -Arguments @("get", "clients", "-r", $Realm, "-q", "clientId=$ClientId")) -join "`n"
+    $json = (Invoke-KeycloakAdmin -CaptureOutput -Arguments @("get", "clients", "-r", $Realm, "-q", "clientId=$ClientId")) -join "`n"
     $clients = @($json | ConvertFrom-Json)
     if ($clients.Count -eq 0) {
         return $null
     }
 
     $clientUuid = $clients[0].id
-    $clientJson = (Invoke-KeycloakAdmin -Arguments @("get", "clients/$clientUuid", "-r", $Realm)) -join "`n"
+    $clientJson = (Invoke-KeycloakAdmin -CaptureOutput -Arguments @("get", "clients/$clientUuid", "-r", $Realm)) -join "`n"
     return ($clientJson | ConvertFrom-Json)
 }
 
@@ -222,7 +246,7 @@ function Save-KeycloakClient {
     )
 
     $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "orderly-keycloak-client.json"
-    $Client | ConvertTo-Json -Depth 40 | Set-Content -Path $tempFile -Encoding utf8
+    $Client | ConvertTo-Json -Depth 40 | Set-Content -Path $tempFile -Encoding ascii
 
     docker cp $tempFile "orderly-keycloak:/tmp/orderly-keycloak-client.json" | Out-Null
     if ($LASTEXITCODE -ne 0) {
@@ -286,7 +310,7 @@ if ($null -eq $client) {
     Write-Host "Client '$clientId' was not found. Creating it..."
     $client = New-FrontendClient -ClientId $clientId
     $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "orderly-new-keycloak-client.json"
-    $client | ConvertTo-Json -Depth 40 | Set-Content -Path $tempFile -Encoding utf8
+    $client | ConvertTo-Json -Depth 40 | Set-Content -Path $tempFile -Encoding ascii
     docker cp $tempFile "orderly-keycloak:/tmp/orderly-new-keycloak-client.json" | Out-Null
     Invoke-KeycloakAdmin -Arguments @("create", "clients", "-r", $realm, "-f", "/tmp/orderly-new-keycloak-client.json") | Out-Null
     Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
