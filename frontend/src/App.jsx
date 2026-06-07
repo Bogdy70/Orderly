@@ -36,6 +36,9 @@ const EMPTY_BLOCK = { type: "checklist", title: "", position: 1 };
 const BLOCK_TYPES = ["checklist", "table", "diagram"];
 const SHAPES = ["task", "note", "milestone", "process", "document", "database", "input", "output", "terminator", "card", "capsule", "stamp", "flag", "wave", "portal", "burst"];
 const EDGE_TYPES = ["arrow", "curved", "elbow", "dashed", "dotted", "dash-dot", "bold", "soft", "double", "plain"];
+const MIN_DIAGRAM_CANVAS_WIDTH = 900;
+const MIN_DIAGRAM_CANVAS_HEIGHT = 470;
+const DIAGRAM_CANVAS_PADDING = 180;
 
 function App() {
   const [route, setRoute] = useState(getRoute());
@@ -830,6 +833,13 @@ function DiagramBlock({ block, content, refresh }) {
   }
 
   const renderedNodes = nodes.map(node => drag?.id === node.id ? { ...node, x: drag.x, y: drag.y } : node);
+  const canvasSize = renderedNodes.reduce(
+    (size, node) => ({
+      width: Math.max(size.width, node.x + node.width + DIAGRAM_CANVAS_PADDING),
+      height: Math.max(size.height, node.y + node.height + DIAGRAM_CANVAS_PADDING)
+    }),
+    { width: MIN_DIAGRAM_CANVAS_WIDTH, height: MIN_DIAGRAM_CANVAS_HEIGHT }
+  );
 
   return (
     <div className="diagram-shell">
@@ -850,86 +860,93 @@ function DiagramBlock({ block, content, refresh }) {
         </select>
         <button className="button secondary small" disabled={!selectedEdge} onClick={saveSelectedEdge}>Save arrow</button>
       </div>
-      <div
-        className="diagram-canvas"
-        onClick={clearNodeForm}
-        onPointerMove={event => {
-          if (!drag) return;
-          const rect = event.currentTarget.getBoundingClientRect();
-          setDrag({ ...drag, x: event.clientX - rect.left - drag.offsetX, y: event.clientY - rect.top - drag.offsetY });
-        }}
-        onPointerUp={endDrag}
-        onPointerCancel={() => {
-          dragRef.current = null;
-          setDrag(null);
-        }}
-      >
-        <svg className="edge-layer">
-          <defs>
-            <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L9,3 z" fill="#5d4b40" />
-            </marker>
-            <marker id="arrow-start" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto">
-              <path d="M9,0 L9,6 L0,3 z" fill="#5d4b40" />
-            </marker>
-          </defs>
-          {edges.map(edge => {
-            const source = renderedNodes.find(node => node.id === edge.sourceNodeId);
-            const target = renderedNodes.find(node => node.id === edge.targetNodeId);
-            if (!source || !target) return null;
-            const selected = selectedEdges.has(edge.id);
-            const type = edge.type || "arrow";
-            const geometry = edgeGeometry(source, target, type);
-            const label = edge.label?.trim();
+      <div className="diagram-canvas-frame">
+        <div
+          className="diagram-canvas"
+          style={{ width: canvasSize.width, height: canvasSize.height }}
+          onClick={clearNodeForm}
+          onPointerMove={event => {
+            if (!drag) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            setDrag({
+              ...drag,
+              x: Math.max(0, event.clientX - rect.left - drag.offsetX),
+              y: Math.max(0, event.clientY - rect.top - drag.offsetY)
+            });
+          }}
+          onPointerUp={endDrag}
+          onPointerCancel={() => {
+            dragRef.current = null;
+            setDrag(null);
+          }}
+        >
+          <svg className="edge-layer">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L9,3 z" fill="#5d4b40" />
+              </marker>
+              <marker id="arrow-start" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto">
+                <path d="M9,0 L9,6 L0,3 z" fill="#5d4b40" />
+              </marker>
+            </defs>
+            {edges.map(edge => {
+              const source = renderedNodes.find(node => node.id === edge.sourceNodeId);
+              const target = renderedNodes.find(node => node.id === edge.targetNodeId);
+              if (!source || !target) return null;
+              const selected = selectedEdges.has(edge.id);
+              const type = edge.type || "arrow";
+              const geometry = edgeGeometry(source, target, type);
+              const label = edge.label?.trim();
+              return (
+                <g
+                  key={edge.id}
+                  className="edge-group"
+                  onClick={event => {
+                    event.stopPropagation();
+                    setSelectedEdges(new Set([edge.id]));
+                    setSelectedNode(null);
+                    setConnectionNodes([]);
+                    setDraft({ label: "", type: "task", color: "#2563eb" });
+                    setEdgeDraft({ label: edge.label || "", type });
+                  }}
+                >
+                  <path
+                    d={geometry.path}
+                    className={`edge edge-${type} ${selected ? "selected" : ""}`}
+                    markerStart={type === "double" ? "url(#arrow-start)" : undefined}
+                    markerEnd={type === "plain" ? undefined : "url(#arrow)"}
+                  />
+                  {label && (
+                    <text className={`edge-label ${selected ? "selected" : ""}`} x={geometry.label.x} y={geometry.label.y - 8}>
+                      {label}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+          {renderedNodes.map(node => {
+            const style = parseJson(node.styleJson);
             return (
-              <g
-                key={edge.id}
-                className="edge-group"
+              <button
+                key={node.id}
+                className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
+                style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb", "--node-color": style.color || "#2563eb" }}
                 onClick={event => {
                   event.stopPropagation();
-                  setSelectedEdges(new Set([edge.id]));
-                  setSelectedNode(null);
-                  setConnectionNodes([]);
-                  setDraft({ label: "", type: "task", color: "#2563eb" });
-                  setEdgeDraft({ label: edge.label || "", type });
+                  selectNode(node.id);
+                }}
+                onPointerDown={event => {
+                  event.stopPropagation();
+                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  setDrag({ id: node.id, x: node.x, y: node.y, offsetX: event.nativeEvent.offsetX, offsetY: event.nativeEvent.offsetY });
                 }}
               >
-                <path
-                  d={geometry.path}
-                  className={`edge edge-${type} ${selected ? "selected" : ""}`}
-                  markerStart={type === "double" ? "url(#arrow-start)" : undefined}
-                  markerEnd={type === "plain" ? undefined : "url(#arrow)"}
-                />
-                {label && (
-                  <text className={`edge-label ${selected ? "selected" : ""}`} x={geometry.label.x} y={geometry.label.y - 8}>
-                    {label}
-                  </text>
-                )}
-              </g>
+                {node.label}
+              </button>
             );
           })}
-        </svg>
-        {renderedNodes.map(node => {
-          const style = parseJson(node.styleJson);
-          return (
-            <button
-              key={node.id}
-              className={`diagram-node ${node.type} ${selectedNode === node.id ? "selected" : ""} ${connectionNodes[0] === node.id ? "connect-start" : ""} ${connectionNodes[1] === node.id ? "connect-target" : ""}`}
-              style={{ left: node.x, top: node.y, width: node.width, height: node.height, borderColor: style.color || "#2563eb", "--node-color": style.color || "#2563eb" }}
-              onClick={event => {
-                event.stopPropagation();
-                selectNode(node.id);
-              }}
-              onPointerDown={event => {
-                event.stopPropagation();
-                event.currentTarget.setPointerCapture?.(event.pointerId);
-                setDrag({ id: node.id, x: node.x, y: node.y, offsetX: event.nativeEvent.offsetX, offsetY: event.nativeEvent.offsetY });
-              }}
-            >
-              {node.label}
-            </button>
-          );
-        })}
+        </div>
       </div>
     </div>
   );
